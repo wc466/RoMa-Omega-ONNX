@@ -25,7 +25,7 @@ five datasets.
 | | |
 |---|---|
 | Hardware | NVIDIA DGX Spark (GB10, aarch64, CUDA 13, unified memory) |
-| Software | torch 2.13.0+cu130, onnx 1.23.2, onnxscript 0.7.2, onnxruntime 1.31.1 (CPU), TensorRT 11.4.0.106; Torch-TensorRT 2.13.0 with TensorRT 11.0.0.114 in a separate environment |
+| Software | torch 2.13.0+cu130, onnx 1.23.2, onnxscript 0.7.2, onnxruntime-gpu 1.31.1, TensorRT 11.4.0.106; Torch-TensorRT 2.13.0 with TensorRT 11.0.0.114 in a separate environment |
 | Upstream | RoMa-Omega `24c693a`, vggt-omega submodule `39a0cb8` |
 | Export | dynamo (`torch.export`) ONNX exporter, opset 18, static shape, batch 1, 512x512 |
 
@@ -52,20 +52,34 @@ upstream benchmarks (mAA@10px); DIODE and MMIM follow the
 mean ± standard deviation over 5 seeds where a deviation is shown, otherwise one
 seed. The seed changes match sampling and the robust estimator, not the network.
 
-| Backend | Precision | WxBS | HardMatch | DIODE RGB-depth | MMIM remote | MMIM medical |
-|---|---|---|---|---|---|---|
-| *PyTorch, full pipeline (released)* | bf16 | 72.07 ± 0.54 | 51.28 | 44.58 | 36.19 ± 1.86 | 51.89 ± 0.49 |
-| PyTorch (upstream default) | bf16 | 63.55 ± 0.62 | 40.97 | 30.78 | 22.63 ± 0.34 | 50.17 ± 0.45 |
-| PyTorch | fp32 | 63.40 ± 0.38 | 40.57 | 30.46 | 21.80 ± 0.71 | 50.08 ± 0.24 |
-| ONNX Runtime (CPU) | fp32 | 63.83 ± 0.56 | not run | not run | 22.75 ± 1.35 | 50.33 ± 0.27 |
-| TensorRT | fp32 | 63.66 ± 0.58 | 41.07 | 30.81 | 22.45 ± 1.07 | 50.08 ± 0.38 |
-| TensorRT, TF32 on | fp32 | 63.53 ± 0.43 | 40.48 | 30.51 | 23.45 ± 1.64 | 50.00 ± 0.34 |
-| Torch-TensorRT | fp32 | 63.54 ± 0.11 | 41.01 | 29.68 | 22.88 ± 0.56 | 50.17 ± 0.22 |
-| **TensorRT** | **bf16** | 62.83 ± 0.97 | 41.07 | 30.61 | 22.42 ± 2.44 | 50.33 ± 0.44 |
-| Torch-TensorRT encoder + PyTorch matcher | bf16 | 63.64 ± 0.84 | 41.33 | 29.98 | 23.12 ± 1.35 | 50.52 ± 0.57 |
-| TensorRT, fp16 encoder + bf16 matcher | fp16/bf16 | 63.72 ± 0.46 | 40.97 | 29.75 | 21.62 ± 2.45 | 49.99 ± 0.40 |
-| TensorRT, all fp16 | fp16 | 3.26 (NaN) | 2.38 (NaN) | 0.00 (NaN) | 0.00 (NaN) | 0.00 (NaN) |
-| PyTorch, fp16 autocast | fp16 | 3.26 (NaN) | not run | not run | 0.31 (NaN) | 0.00 (NaN) |
+How to read the first two columns:
+
+- **Model** is what gets loaded. *PyTorch checkpoint* is the authors' original model; *ONNX export*
+  is the pair of `.onnx` graphs produced by this repository.
+- **Runs on** is the software that executes it. *PyTorch* is the authors' own code.
+  *Torch-TensorRT* compiles the PyTorch model with TensorRT directly, with no ONNX
+  file. *ONNX Runtime* runs the ONNX graphs as they are. *TensorRT* compiles the
+  ONNX graphs into an optimised GPU engine.
+
+| Model | Runs on | Precision | WxBS | HardMatch | DIODE RGB-depth | MMIM remote | MMIM medical |
+|---|---|---|---|---|---|---|---|
+| PyTorch checkpoint | *PyTorch, full pipeline (as released)* | bf16 | 72.07 ± 0.54 | 51.28 | 44.58 | 36.19 ± 1.86 | 51.89 ± 0.49 |
+| PyTorch checkpoint | PyTorch (upstream default) | bf16 | 63.55 ± 0.62 | 40.97 | 30.78 | 22.63 ± 0.34 | 50.17 ± 0.45 |
+| PyTorch checkpoint | PyTorch | fp32 | 63.40 ± 0.38 | 40.57 | 30.46 | 21.80 ± 0.71 | 50.08 ± 0.24 |
+| PyTorch checkpoint | PyTorch, fp16 autocast | fp16 | 3.26 (NaN) | not run | not run | 0.31 (NaN) | 0.00 (NaN) |
+| PyTorch checkpoint | Torch-TensorRT | fp32 | 63.54 ± 0.11 | 41.01 | 29.68 | 22.88 ± 0.56 | 50.17 ± 0.22 |
+| PyTorch checkpoint | Torch-TensorRT encoder + PyTorch matcher | bf16 | 63.64 ± 0.84 | 41.33 | 29.98 | 23.12 ± 1.35 | 50.52 ± 0.57 |
+| ONNX export | ONNX Runtime, CPU | fp32 | 63.83 ± 0.56 | not run | not run | 22.75 ± 1.35 | 50.33 ± 0.27 |
+| ONNX export | ONNX Runtime, GPU | fp32 | 63.29 ± 0.54 | 41.16 | 30.04 | 22.37 ± 0.37 | 50.06 ± 0.24 |
+| ONNX export | TensorRT | fp32 | 63.66 ± 0.58 | 41.07 | 30.81 | 22.45 ± 1.07 | 50.08 ± 0.38 |
+| ONNX export | TensorRT, TF32 on | fp32 | 63.53 ± 0.43 | 40.48 | 30.51 | 23.45 ± 1.64 | 50.00 ± 0.34 |
+| **ONNX export** | **TensorRT** | **bf16** | 62.83 ± 0.97 | 41.07 | 30.61 | 22.42 ± 2.44 | 50.33 ± 0.44 |
+| ONNX export | TensorRT, fp16 encoder + bf16 matcher | fp16/bf16 | 63.72 ± 0.46 | 40.97 | 29.75 | 21.62 ± 2.45 | 49.99 ± 0.40 |
+| ONNX export | TensorRT, all fp16 | fp16 | 3.26 (NaN) | 2.38 (NaN) | 0.00 (NaN) | 0.00 (NaN) | 0.00 (NaN) |
+
+All rows except the first run the coarse matcher only. "Upstream default" means the
+authors' own setting: fp32 weights computed under bf16 autocast (PyTorch's automatic
+mixed precision).
 
 ![Accuracy by backend and precision](deployment/figures/accuracy.png)
 
@@ -74,10 +88,8 @@ Reading the table:
 - Every working export agrees with upstream PyTorch within the seed spread on the
   three multi-seed datasets. HardMatch and DIODE are single-seed, so differences
   there (up to about 1 point on DIODE) cannot be separated from noise with this data.
-- ONNX Runtime was only run on the small datasets: only the CPU provider is
-  available on this machine and it takes about 8 s per pair. TensorRT fp32 without
-  TF32 reproduces its warp to 0.002 px on the validation pair and stands in for it
-  on HardMatch and DIODE.
+- ONNX Runtime on CPU was only run on the small datasets, at about 8 s per pair. On
+  GPU it uses the CUDA execution provider with TF32 disabled.
 - The released-model reference reproduces the published WxBS (71.98 in the upstream
   README) and HardMatch (51.10) numbers.
 
@@ -87,18 +99,19 @@ One image pair, 512x512, median of 50 runs after 10 warm-up runs, each variant i
 fresh process on an idle GPU. Peak memory is the largest drop in system
 `MemAvailable` while the process runs, because host and GPU share memory on the GB10.
 
-| Backend | Precision | Latency (ms) | Encoder / matcher (ms) | Peak memory (GB) | Weights on disk (GB) |
-|---|---|---|---|---|---|
-| PyTorch | fp32 | 510 | 442 / 68 | 11.6 | 4.7 |
-| ONNX Runtime (CPU) | fp32 | 8,316 | 7,113 / 1,210 | 6.8 | 3.8 |
-| TensorRT | fp32 | 675 | 575 / 98 | 7.5 | 3.9 |
-| TensorRT, TF32 on | fp32 | 472 | 402 / 70 | 7.5 | 3.8 |
-| Torch-TensorRT | fp32 | 697 | 590 / 98 | (see note) | 4.7 |
-| PyTorch (upstream default) | bf16 | 268 | 243 / 25 | 11.7 | 4.7 |
-| **TensorRT** | **bf16** | **96** | 84 / 12 | **4.1** | **1.9** |
-| Torch-TensorRT encoder + PyTorch matcher | bf16 | 116 | 89 / 23 | (see note) | 4.7 |
-| TensorRT, fp16 encoder + bf16 matcher | fp16/bf16 | 96 | 84 / 12 | 4.1 | 1.9 |
-| TensorRT, all fp16 (output is NaN) | fp16 | 97 | 84 / 12 | 3.9 | 1.9 |
+| Model | Runs on | Precision | Latency (ms) | Encoder / matcher (ms) | Peak memory (GB) | Weights on disk (GB) |
+|---|---|---|---|---|---|---|
+| PyTorch checkpoint | PyTorch (upstream default) | bf16 | 268 | 243 / 25 | 11.7 | 4.7 |
+| PyTorch checkpoint | PyTorch | fp32 | 510 | 442 / 68 | 11.6 | 4.7 |
+| PyTorch checkpoint | Torch-TensorRT | fp32 | 697 | 590 / 98 | (see note) | 4.7 |
+| PyTorch checkpoint | Torch-TensorRT encoder + PyTorch matcher | bf16 | 116 | 89 / 23 | (see note) | 4.7 |
+| ONNX export | ONNX Runtime, CPU | fp32 | 8,316 | 7,113 / 1,210 | 6.8 | 3.8 |
+| ONNX export | ONNX Runtime, GPU | fp32 | 1,018 | 879 / 156 | 11.5 | 3.8 |
+| ONNX export | TensorRT | fp32 | 675 | 575 / 98 | 7.5 | 3.9 |
+| ONNX export | TensorRT, TF32 on | fp32 | 472 | 402 / 70 | 7.5 | 3.8 |
+| **ONNX export** | **TensorRT** | **bf16** | **96** | 84 / 12 | **4.1** | **1.9** |
+| ONNX export | TensorRT, fp16 encoder + bf16 matcher | fp16/bf16 | 96 | 84 / 12 | 4.1 | 1.9 |
+| ONNX export | TensorRT, all fp16 (output is NaN) | fp16 | 97 | 84 / 12 | 3.9 | 1.9 |
 
 For reference, the released full pipeline takes 1,766 ms per pair and peaks at 22.0 GB.
 
@@ -114,6 +127,11 @@ Notes:
   when only the coarse stage runs.
 - Torch-TensorRT compiles inside the measured process (22-30 GB peak), so its
   memory figure is a build footprint and is left out.
+- ONNX Runtime on GPU is the slowest GPU option for the same fp32 graph (1,018 ms
+  against 675 ms for TensorRT) and uses more memory. With its default TF32 setting
+  it ran at about 814 ms in a quick 20-run check, but the warp on the validation
+  pair moved by up to 5 px, against 0.04 px with TF32 disabled. It cannot load the
+  bf16 graphs (no bf16 `Conv`), so there is no bf16 ONNX Runtime row.
 - fp32 TensorRT with TF32 disabled is slower than fp32 PyTorch. The cause was not
   investigated.
 
@@ -160,7 +178,7 @@ uv sync --frozen --directory RoMa-Omega
 ```
 
 ```bash
-uv pip install --python RoMa-Omega/.venv/bin/python onnx==1.23.2 onnxscript==0.7.2 onnxruntime==1.31.1 tensorrt-cu13==11.4.0.106 matplotlib
+uv pip install --python RoMa-Omega/.venv/bin/python onnx==1.23.2 onnxscript==0.7.2 onnxruntime-gpu==1.31.1 tensorrt-cu13==11.4.0.106 matplotlib
 ```
 
 The VGGT-Ω checkpoint is gated on Hugging Face (`facebook/VGGT-Omega`,
@@ -209,11 +227,11 @@ RoMa-Omega/.venv/bin/python deployment/prepare_diode.py
 Accuracy (small datasets, five seeds; then the large ones, one seed):
 
 ```bash
-RoMa-Omega/.venv/bin/python deployment/eval_datasets.py --datasets wxbs,mmim_remote,mmim_medical --seeds 1,2,3,4,5 --variants torch_bf16_full,torch_bf16_coarse,torch_fp32_coarse,torch_fp16_coarse,onnx_fp32_coarse,trt_fp32_coarse,trt_fp32_tf32_coarse,trt_bf16_coarse,trt_fp16enc_bf16mat_coarse,trt_fp16_coarse
+RoMa-Omega/.venv/bin/python deployment/eval_datasets.py --datasets wxbs,mmim_remote,mmim_medical --seeds 1,2,3,4,5 --variants torch_bf16_full,torch_bf16_coarse,torch_fp32_coarse,torch_fp16_coarse,onnx_fp32_coarse,onnx_gpu_fp32_coarse,trt_fp32_coarse,trt_fp32_tf32_coarse,trt_bf16_coarse,trt_fp16enc_bf16mat_coarse,trt_fp16_coarse
 ```
 
 ```bash
-RoMa-Omega/.venv/bin/python deployment/eval_datasets.py --datasets hardmatch,diode --seeds 1 --variants torch_bf16_full,torch_bf16_coarse,torch_fp32_coarse,trt_fp32_coarse,trt_fp32_tf32_coarse,trt_bf16_coarse,trt_fp16enc_bf16mat_coarse,trt_fp16_coarse
+RoMa-Omega/.venv/bin/python deployment/eval_datasets.py --datasets hardmatch,diode --seeds 1 --variants torch_bf16_full,torch_bf16_coarse,torch_fp32_coarse,onnx_gpu_fp32_coarse,trt_fp32_coarse,trt_fp32_tf32_coarse,trt_bf16_coarse,trt_fp16enc_bf16mat_coarse,trt_fp16_coarse
 ```
 
 Latency and memory, then figures:

@@ -34,6 +34,7 @@ VARIANTS = {
     "torch_bf16_full": ("PyTorch, full pipeline (released)", "ref"),
     "torch_fp32_coarse": ("PyTorch fp32", "fp32"),
     "onnx_fp32_coarse": ("ONNX Runtime (CPU) fp32", "fp32"),
+    "onnx_gpu_fp32_coarse": ("ONNX Runtime (GPU) fp32", "fp32"),
     "trt_fp32_coarse": ("TensorRT fp32", "fp32"),
     "trt_fp32_tf32_coarse": ("TensorRT fp32 + TF32", "fp32"),
     "torchtrt_fp32_coarse": ("Torch-TensorRT fp32", "fp32"),

@@ -12,6 +12,8 @@ computes the network outputs:
   torch_fp32_coarse  same, autocast disabled
   torch_fp16_coarse  same, upstream's autocast forced to IEEE float16
   onnx_fp32_coarse   fp32 encoder.onnx -> matcher.onnx on ONNX Runtime (CPU)
+  onnx_gpu_fp32_coarse  same graphs on ONNX Runtime's CUDA provider, TF32
+                     disabled (needs the onnxruntime-gpu package)
   trt_fp32_coarse    TensorRT engines from the fp32 graphs, TF32 disabled
   trt_fp32_tf32_coarse  same graphs, TensorRT default build (TF32 enabled)
   trt_bf16_coarse    TensorRT engines from the bf16-compute graphs
@@ -50,6 +52,7 @@ VARIANTS = (
     "torch_fp32_coarse",
     "torch_fp16_coarse",
     "onnx_fp32_coarse",
+    "onnx_gpu_fp32_coarse",
     "trt_fp32_coarse",
     "trt_fp32_tf32_coarse",
     "trt_bf16_coarse",
@@ -62,6 +65,7 @@ TORCHTRT_VARIANTS = {"torchtrt_fp32_coarse": "fp32", "torchtrt_bf16_coarse": "bf
 # Graph-backed variants: (encoder precision, matcher precision, file suffix).
 GRAPH_VARIANTS = {
     "onnx_fp32_coarse": ("fp32", "fp32", ".onnx"),
+    "onnx_gpu_fp32_coarse": ("fp32", "fp32", ".onnx"),
     "trt_fp32_coarse": ("fp32", "fp32", ".notf32.engine"),
     "trt_fp32_tf32_coarse": ("fp32", "fp32", ".engine"),
     "trt_bf16_coarse": ("bf16", "bf16", ".engine"),
@@ -71,6 +75,12 @@ GRAPH_VARIANTS = {
 # Upstream samples 5000 matches. Coarse-only at 512x512 the warp is a 128x128
 # grid (16384 cells) and VGGTRoMa.sample draws 4x the count without
 # replacement, so the coarse variants use 2000.
+# ONNX Runtime execution provider per variant. The CUDA provider enables TF32
+# by default; it is disabled here to match the TensorRT --no-tf32 engines.
+ONNX_PROVIDERS = {
+    "onnx_fp32_coarse": "CPUExecutionProvider",
+    "onnx_gpu_fp32_coarse": ("CUDAExecutionProvider", {"use_tf32": "0"}),
+}
 DEFAULT_NUM_CORRESP = {"full": 5000, "coarse": 2000}
 
 
@@ -113,12 +123,15 @@ class _GraphCoarseMatcher(nn.Module):
 
 
 class OnnxCoarseMatcher(_GraphCoarseMatcher):
-    def __init__(self, encoder: Path, matcher: Path, provider: str = "CPUExecutionProvider"):
+    def __init__(self, encoder: Path, matcher: Path, provider="CPUExecutionProvider"):
         super().__init__()
         import onnxruntime as ort
 
         self.encoder = ort.InferenceSession(str(encoder), providers=[provider])
         self.matcher = ort.InferenceSession(str(matcher), providers=[provider])
+        # ONNX Runtime falls back to CPU silently if a provider fails to load.
+        wanted = provider if isinstance(provider, str) else provider[0]
+        assert self.encoder.get_providers()[0] == wanted, self.encoder.get_providers()
         self.feat_names = [i.name for i in self.matcher.get_inputs()]
         assert [o.name for o in self.encoder.get_outputs()] == self.feat_names
         self.input_shape = tuple(self.encoder.get_inputs()[0].shape)
@@ -235,8 +248,10 @@ class RoMaOmegaVariants:
             encoder = self.artifacts / f"encoder_{self.size}_{enc_prec}" / f"encoder{suffix}"
             matcher = self.artifacts / f"matcher_{self.size}_{mat_prec}" / f"matcher{suffix}"
             assert encoder.exists() and matcher.exists(), f"{variant}: missing {encoder} or {matcher}"
-            cls = OnnxCoarseMatcher if suffix == ".onnx" else TrtCoarseMatcher
-            self._graph_matchers[variant] = cls(encoder, matcher)
+            if suffix == ".onnx":
+                self._graph_matchers[variant] = OnnxCoarseMatcher(encoder, matcher, ONNX_PROVIDERS[variant])
+            else:
+                self._graph_matchers[variant] = TrtCoarseMatcher(encoder, matcher)
         return self._graph_matchers[variant]
 
     def select(self, variant: str):

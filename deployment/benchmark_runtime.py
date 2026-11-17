@@ -42,6 +42,7 @@ DEFAULT_VARIANTS = (
     "torch_fp32_coarse",
     "torch_bf16_coarse",
     "onnx_fp32_coarse",
+    "onnx_gpu_fp32_coarse",
     "trt_fp32_coarse",
     "trt_fp32_tf32_coarse",
     "trt_bf16_coarse",
@@ -104,17 +105,23 @@ def child(variant: str, warmup: int, runs: int) -> dict:
             import onnxruntime as ort
 
             disk = sum(Path(str(p) + ".data").stat().st_size + p.stat().st_size for p in (enc_path, mat_path))
-            enc = ort.InferenceSession(str(enc_path), providers=["CPUExecutionProvider"])
-            mat = ort.InferenceSession(str(mat_path), providers=["CPUExecutionProvider"])
+            from matchers import ONNX_PROVIDERS
+
+            provider = ONNX_PROVIDERS[variant]
+            on_gpu = provider != "CPUExecutionProvider"
+            enc = ort.InferenceSession(str(enc_path), providers=[provider])
+            mat = ort.InferenceSession(str(mat_path), providers=[provider])
+            assert (enc.get_providers()[0] == "CUDAExecutionProvider") == on_gpu, enc.get_providers()
+            n_warm, n = (warmup, runs) if on_gpu else (1, 5)
             an, bn = a.cpu().numpy(), b.cpu().numpy()
             names = [i.name for i in mat.get_inputs()]
             feats = enc.run(None, {"img_A": an, "img_B": bn})
-            parts["encoder"] = timed(lambda: enc.run(None, {"img_A": an, "img_B": bn}), 1, 5)
-            parts["matcher"] = timed(lambda: mat.run(None, dict(zip(names, feats))), 1, 5)
+            parts["encoder"] = timed(lambda: enc.run(None, {"img_A": an, "img_B": bn}), n_warm, n)
+            parts["matcher"] = timed(lambda: mat.run(None, dict(zip(names, feats))), n_warm, n)
             total = timed(
-                lambda: mat.run(None, dict(zip(names, enc.run(None, {"img_A": an, "img_B": bn})))), 1, 5
+                lambda: mat.run(None, dict(zip(names, enc.run(None, {"img_A": an, "img_B": bn})))), n_warm, n
             )
-            extra["device"] = "CPU (20 cores)"
+            extra["device"] = "GPU (CUDA provider, TF32 disabled)" if on_gpu else "CPU (20 cores)"
         else:
             from trt_common import TrtRunner
 

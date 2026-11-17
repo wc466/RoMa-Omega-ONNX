@@ -323,6 +323,36 @@
       "matcher_backend": "pytorch (AssertionError compiling with Torch-TensorRT)",
       "torch_peak_mb": 5731.7,
       "system_peak_mb": 21940.6
+    },
+    {
+      "variant": "onnx_gpu_fp32_coarse",
+      "total": {
+        "median_ms": 1018.1,
+        "mean_ms": 1015.91,
+        "p95_ms": 1054.36,
+        "min_ms": 964.72,
+        "runs": 50
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 878.59,
+          "mean_ms": 869.51,
+          "p95_ms": 898.55,
+          "min_ms": 808.58,
+          "runs": 50
+        },
+        "matcher": {
+          "median_ms": 156.04,
+          "mean_ms": 154.83,
+          "p95_ms": 163.87,
+          "min_ms": 141.76,
+          "runs": 50
+        }
+      },
+      "gpu_delta_mb": 10486.0,
+      "disk_mb": 3933.0,
+      "device": "GPU (CUDA provider, TF32 disabled)",
+      "system_peak_mb": 11727.3
     }
   ]
 }
