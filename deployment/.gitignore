@@ -1,0 +1,7 @@
+# Exported graphs, engines and their weights. Do not commit until licenses are
+# checked (the VGGT-Omega encoder is under the FAIR Noncommercial Research License).
+artifacts/
+
+# The repository root ignores every results/ directory; the benchmark results
+# here are small JSON files that belong with the report.
+!results/

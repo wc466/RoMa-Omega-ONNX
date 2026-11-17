@@ -1,0 +1,3 @@
+[submodule "RoMa-Omega"]
+	path = RoMa-Omega
+	url = https://github.com/davnords/RoMa-Omega

@@ -1,0 +1,58 @@
+{
+  "dataset": "diode",
+  "variant": "torchtrt_bf16_coarse",
+  "metric": "auc@10",
+  "scale": "0-100",
+  "setting": {
+    "matcher_backend": "pytorch (AssertionError compiling with Torch-TensorRT)",
+    "stage": "matcher",
+    "H_lr": 512,
+    "W_lr": 512,
+    "H_hr": null,
+    "W_hr": null,
+    "bidirectional": false,
+    "num_corresp": 2000
+  },
+  "seeds": [
+    1
+  ],
+  "mean": 29.982924423944784,
+  "std": null,
+  "min": 29.982924423944784,
+  "max": 29.982924423944784,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 29.982924423944784,
+      "seconds": 263.6,
+      "empty_matches": 0,
+      "result": {
+        "scenes": {
+          "DIO-depth": {
+            "auc@1": 0.06414578367241829,
+            "auc@3": 1.5907523477024028,
+            "auc@5": 7.949895495256501,
+            "auc@7": 17.1506540810428,
+            "auc@10": 29.982924423944784,
+            "auc@15": 45.37732602591294,
+            "auc@20": 55.458698371600676,
+            "pairs": 892,
+            "failed": 0,
+            "median_error_px": 7.011500358581543
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.06414578367241829,
+          "auc@3": 1.5907523477024028,
+          "auc@5": 7.949895495256501,
+          "auc@7": 17.1506540810428,
+          "auc@10": 29.982924423944784,
+          "auc@15": 45.37732602591294,
+          "auc@20": 55.458698371600676
+        },
+        "pairs": 892,
+        "failed": 0
+      }
+    }
+  ]
+}

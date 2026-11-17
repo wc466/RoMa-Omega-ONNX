@@ -1,0 +1,57 @@
+{
+  "dataset": "diode",
+  "variant": "trt_fp16enc_bf16mat_coarse",
+  "metric": "auc@10",
+  "scale": "0-100",
+  "setting": {
+    "stage": "matcher",
+    "H_lr": 512,
+    "W_lr": 512,
+    "H_hr": null,
+    "W_hr": null,
+    "bidirectional": false,
+    "num_corresp": 2000
+  },
+  "seeds": [
+    1
+  ],
+  "mean": 29.746365887969063,
+  "std": null,
+  "min": 29.746365887969063,
+  "max": 29.746365887969063,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 29.746365887969063,
+      "seconds": 131.7,
+      "empty_matches": 0,
+      "result": {
+        "scenes": {
+          "DIO-depth": {
+            "auc@1": 0.0,
+            "auc@3": 1.8942458969951563,
+            "auc@5": 8.249131005441127,
+            "auc@7": 17.276436073286728,
+            "auc@10": 29.746365887969063,
+            "auc@15": 45.02532502728192,
+            "auc@20": 55.03797295315383,
+            "pairs": 892,
+            "failed": 0,
+            "median_error_px": 7.0781848430633545
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 1.8942458969951563,
+          "auc@5": 8.249131005441127,
+          "auc@7": 17.276436073286728,
+          "auc@10": 29.746365887969063,
+          "auc@15": 45.02532502728192,
+          "auc@20": 55.03797295315383
+        },
+        "pairs": 892,
+        "failed": 0
+      }
+    }
+  ]
+}

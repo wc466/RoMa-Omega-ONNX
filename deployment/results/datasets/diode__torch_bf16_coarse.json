@@ -1,0 +1,57 @@
+{
+  "dataset": "diode",
+  "variant": "torch_bf16_coarse",
+  "metric": "auc@10",
+  "scale": "0-100",
+  "setting": {
+    "stage": "matcher",
+    "H_lr": 512,
+    "W_lr": 512,
+    "H_hr": null,
+    "W_hr": null,
+    "bidirectional": false,
+    "num_corresp": 2000
+  },
+  "seeds": [
+    1
+  ],
+  "mean": 30.77960680418485,
+  "std": null,
+  "min": 30.77960680418485,
+  "max": 30.77960680418485,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 30.77960680418485,
+      "seconds": 283.4,
+      "empty_matches": 0,
+      "result": {
+        "scenes": {
+          "DIO-depth": {
+            "auc@1": 0.0,
+            "auc@3": 1.7823585480317938,
+            "auc@5": 8.647979390995385,
+            "auc@7": 17.738618093144808,
+            "auc@10": 30.77960680418485,
+            "auc@15": 46.39300415512336,
+            "auc@20": 56.3651351891291,
+            "pairs": 892,
+            "failed": 0,
+            "median_error_px": 6.960876941680908
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 1.7823585480317938,
+          "auc@5": 8.647979390995385,
+          "auc@7": 17.738618093144808,
+          "auc@10": 30.77960680418485,
+          "auc@15": 46.39300415512336,
+          "auc@20": 56.3651351891291
+        },
+        "pairs": 892,
+        "failed": 0
+      }
+    }
+  ]
+}

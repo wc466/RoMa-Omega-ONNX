@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv*/
+.claude/
+
+# Data, checkpoints and third-party checkouts (downloaded separately, see README)
+data/
+.WxBS/
+MINIMA/
+*.pt
+*.pth
