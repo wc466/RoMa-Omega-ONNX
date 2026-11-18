@@ -1,0 +1,67 @@
+{
+  "dataset": "hardmatch",
+  "variant": "torchtrt_fp32",
+  "config": "c800x800_r1280x1280_bidir",
+  "metric": "mAA_10px",
+  "scale": "0-100",
+  "setting": {
+    "tag": "c800x800_r1280x1280_bidir",
+    "coarse_size": [
+      800,
+      800
+    ],
+    "refine_size": [
+      1280,
+      1280
+    ],
+    "direction": "both",
+    "refiners": true,
+    "num_corresp": 5000,
+    "backends": {
+      "encoder": "torch_tensorrt",
+      "matcher": "torch_tensorrt",
+      "refiner": "torch_tensorrt",
+      "refiner2": "pytorch (ValueError compiling with Torch-TensorRT)"
+    }
+  },
+  "seeds": [
+    1
+  ],
+  "mean": 51.0384738445282,
+  "std": null,
+  "min": 51.0384738445282,
+  "max": 51.0384738445282,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 51.0384738445282,
+      "seconds": 8943.4,
+      "empty_matches": 0,
+      "result": {
+        "avg_pck": [
+          0.0,
+          0.21493622660636902,
+          0.37365081906318665,
+          0.48059508204460144,
+          0.548501193523407,
+          0.5983468890190125,
+          0.6349427700042725,
+          0.6610607504844666,
+          0.6830995678901672,
+          0.702092707157135,
+          0.7170062065124512,
+          0.7271809577941895,
+          0.7384751439094543,
+          0.7465991377830505,
+          0.756725549697876,
+          0.7644634246826172,
+          0.7740716934204102,
+          0.780756413936615,
+          0.7864434123039246,
+          0.7916924357414246
+        ],
+        "mAA_10px": 0.510384738445282
+      }
+    }
+  ]
+}

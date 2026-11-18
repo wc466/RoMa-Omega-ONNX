@@ -11,7 +11,7 @@ with fp32 inputs and outputs.
 
 Run from the repository root:
 
-    python deployment/export_matcher.py --height 512 --width 512
+    python deployment/export_matcher.py --height 800 --width 800
 """
 
 from __future__ import annotations
@@ -45,8 +45,8 @@ from common import (  # noqa: E402
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("--height", type=int, default=512, help="image height fed to the encoder")
-    p.add_argument("--width", type=int, default=512, help="image width fed to the encoder")
+    p.add_argument("--height", type=int, default=800, help="image height fed to the encoder")
+    p.add_argument("--width", type=int, default=800, help="image width fed to the encoder")
     p.add_argument("--opset", type=int, default=18)
     p.add_argument(
         "--precision",
@@ -56,7 +56,10 @@ def main() -> None:
         "weights, bf16 computation where upstream autocast applies, fp32 I/O. "
         "fp16: same placement with IEEE float16",
     )
-    p.add_argument("--bidirectional", action="store_true", help="also output warp_BA/confidence_BA")
+    p.add_argument(
+        "--direction", choices=["both", "ab"], default="both",
+        help="both: also output warp_BA/confidence_BA; ab: A->B only",
+    )
     p.add_argument(
         "--rewrite-deconv",
         choices=["auto", "on", "off"],
@@ -67,6 +70,7 @@ def main() -> None:
     p.add_argument("--out-dir", type=Path, default=None)
     args = p.parse_args()
 
+    args.bidirectional = args.direction == "both"
     if args.height % PATCH_SIZE or args.width % PATCH_SIZE:
         raise SystemExit(f"height and width must be multiples of {PATCH_SIZE}")
     H_p, W_p = args.height // PATCH_SIZE, args.width // PATCH_SIZE

@@ -1,0 +1,69 @@
+{
+  "dataset": "diode",
+  "variant": "trt_fp16",
+  "config": "c800x800_r1280x1280_bidir",
+  "metric": "auc@10",
+  "scale": "0-100",
+  "setting": {
+    "tag": "c800x800_r1280x1280_bidir",
+    "coarse_size": [
+      800,
+      800
+    ],
+    "refine_size": [
+      1280,
+      1280
+    ],
+    "direction": "both",
+    "refiners": true,
+    "num_corresp": 5000,
+    "backends": {
+      "encoder": "tensorrt",
+      "matcher": "tensorrt",
+      "refiner": "tensorrt",
+      "refiner2": "tensorrt"
+    }
+  },
+  "seeds": [
+    1
+  ],
+  "mean": 0.0,
+  "std": null,
+  "min": 0.0,
+  "max": 0.0,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 0.0,
+      "seconds": 1293.6,
+      "empty_matches": 887,
+      "result": {
+        "scenes": {
+          "DIO-depth": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 892,
+            "failed": 887,
+            "median_error_px": 397.9337463378906
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 0.0,
+          "auc@5": 0.0,
+          "auc@7": 0.0,
+          "auc@10": 0.0,
+          "auc@15": 0.0,
+          "auc@20": 0.0
+        },
+        "pairs": 892,
+        "failed": 887
+      }
+    }
+  ]
+}

@@ -151,6 +151,48 @@ def tracing_context(precision: str):
     return contextlib.nullcontext()  # bf16: upstream's autocast as written
 
 
+def per_offset_local_corr(
+    feature0, feature1, warp, local_window, B, K, c, r, h, w, device,
+    padding_mode="zeros", sample_mode="bilinear", dtype=torch.float32,
+):
+    """Same result as ``romaomega.local_correlation.native_torch_local_corr``.
+
+    Upstream samples all K window offsets in one ``grid_sample`` call, which
+    materialises a ``(c, h, w * K)`` tensor (3.9 GB at 1280 px for the patch-4
+    refiner). Here each offset is sampled separately: the same bilinear
+    samples, the same products, the same sum over channels, but K tensors of
+    ``(c, h, w)``. Exported runtimes are much faster on this form.
+    """
+    f0 = feature0 / (c**0.5)
+    corr = []
+    for k in range(K):
+        coords = warp + local_window[:, k][:, None, None]
+        sampled = nn.functional.grid_sample(
+            feature1, coords, padding_mode=padding_mode, align_corners=False, mode=sample_mode
+        )
+        corr.append((f0 * sampled).sum(dim=1))
+    return torch.stack(corr, dim=1).to(dtype)
+
+
+@contextlib.contextmanager
+def local_corr_impl(name: str):
+    """Select the local-correlation implementation used by the refiners:
+    ``upstream`` (as written) or ``per_offset`` (per_offset_local_corr).
+    Upstream looks the function up as a module global, so it is swapped there
+    for the duration of the block; upstream files are not edited."""
+    import romaomega.local_correlation as lc
+
+    original = lc.native_torch_local_corr
+    if name == "per_offset":
+        lc.native_torch_local_corr = per_offset_local_corr
+    else:
+        assert name == "upstream", name
+    try:
+        yield
+    finally:
+        lc.native_torch_local_corr = original
+
+
 COMPUTE_DTYPE = {
     "fp32": "fp32",
     "bf16": "bf16 (torch.autocast, as upstream)",
@@ -252,11 +294,97 @@ class MatcherWrapper(nn.Module):
         return outputs
 
 
+class RefinerStageWrapper(nn.Module):
+    """One refinement pass of RoMa-Omega at a fixed image resolution.
+
+    Re-states the body of the refinement loop in ``VGGTRoMa.forward`` for one
+    ``(img_A, img_B)`` resolution: VGG19-BN fine features, then the patch-4,
+    patch-2 and patch-1 ConvRefiners, each starting from the previous warp and
+    confidence resized to its grid. Calls upstream's own submodules and
+    ``_interpolate_warp_and_confidence``. Validate against upstream
+    ``VGGTRoMa.forward`` (see validate_pipeline.py), not against this wrapper.
+
+    ``second_pass=True`` is the high-resolution pass that follows a first
+    refinement pass: upstream then zeroes the incoming precision channels
+    before the patch-4 refiner.
+
+    Inputs: images in [0, 1], ``(B, 3, H, W)``; previous warp ``(B, h, w, 2)``
+    and confidence ``(B, h, w, C)`` with C = 1 after the matcher and 4 after a
+    refinement pass; the same for the B->A direction when ``bidirectional``.
+    Outputs: warp ``(B, H, W, 2)`` and confidence ``(B, H, W, 4)`` per direction.
+    """
+
+    def __init__(self, model: nn.Module, bidirectional: bool = True, second_pass: bool = False):
+        super().__init__()
+        assert model.refiners is not None and model.refiner_features is not None
+        self.refiners = model.refiners
+        self.refiner_features = model.refiner_features
+        self.anchor_width = model.anchor_width
+        self.anchor_height = model.anchor_height
+        self.bidirectional = bidirectional
+        self.second_pass = second_pass
+
+    def forward(self, img_A: torch.Tensor, img_B: torch.Tensor, *prev: torch.Tensor):
+        from romaomega.device import device
+        from romaomega.vggtroma import _interpolate_warp_and_confidence
+
+        # Upstream zeroes the precision channels in place; do not mutate inputs.
+        warp_AB, confidence_AB = prev[0], prev[1].clone()
+        warp_BA = confidence_BA = None
+        if self.bidirectional:
+            warp_BA, confidence_BA = prev[2], prev[3].clone()
+        B, C, H, W = img_A.shape
+        scale_factor = torch.tensor(
+            (W / self.anchor_width, H / self.anchor_height), device=device
+        )
+        refiner_features_A = self.refiner_features(img_A)
+        refiner_features_B = self.refiner_features(img_B)
+        for patch_size_str, refiner in self.refiners.items():
+            patch_size = int(patch_size_str)
+            zero_out_precision = self.second_pass and patch_size == 4
+            warp_AB, confidence_AB = _interpolate_warp_and_confidence(
+                warp=warp_AB, confidence=confidence_AB, H=H, W=W,
+                patch_size=patch_size, zero_out_precision=zero_out_precision,
+            )
+            if self.bidirectional:
+                warp_BA, confidence_BA = _interpolate_warp_and_confidence(
+                    warp=warp_BA, confidence=confidence_BA, H=H, W=W,
+                    patch_size=patch_size, zero_out_precision=zero_out_precision,
+                )
+            f_patch_A = refiner_features_A[patch_size]
+            f_patch_B = refiner_features_B[patch_size]
+            out_AB = refiner(
+                f_A=f_patch_A, f_B=f_patch_B, prev_warp=warp_AB,
+                prev_confidence=confidence_AB, scale_factor=scale_factor,
+            )
+            warp_AB, confidence_AB = out_AB["warp"], out_AB["confidence"]
+            if self.bidirectional:
+                out_BA = refiner(
+                    f_A=f_patch_B, f_B=f_patch_A, prev_warp=warp_BA,
+                    prev_confidence=confidence_BA, scale_factor=scale_factor,
+                )
+                warp_BA, confidence_BA = out_BA["warp"], out_BA["confidence"]
+        if self.bidirectional:
+            return warp_AB, confidence_AB, warp_BA, confidence_BA
+        return warp_AB, confidence_AB
+
+
 def matcher_output_names(bidirectional: bool) -> list[str]:
     names = ["warp_AB", "confidence_AB"]
     if bidirectional:
         names += ["warp_BA", "confidence_BA"]
     return names
+
+
+def refiner_io_names(bidirectional: bool) -> tuple[list[str], list[str]]:
+    """Input and output tensor names of a refinement-pass graph."""
+    dirs = ("AB", "BA") if bidirectional else ("AB",)
+    names_in = ["img_A", "img_B"]
+    names_out = []
+    for d in dirs:
+        names_in += [f"prev_warp_{d}", f"prev_confidence_{d}"]
+        names_out += [f"warp_{d}", f"confidence_{d}"]
+    return names_in, names_out
 
 
 def output_names(layers: tuple[int, ...]) -> list[str]:

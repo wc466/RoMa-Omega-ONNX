@@ -1,0 +1,67 @@
+{
+  "dataset": "hardmatch",
+  "variant": "torchtrt_bf16",
+  "config": "c800x800_r1280x1280_bidir",
+  "metric": "mAA_10px",
+  "scale": "0-100",
+  "setting": {
+    "tag": "c800x800_r1280x1280_bidir",
+    "coarse_size": [
+      800,
+      800
+    ],
+    "refine_size": [
+      1280,
+      1280
+    ],
+    "direction": "both",
+    "refiners": true,
+    "num_corresp": 5000,
+    "backends": {
+      "encoder": "torch_tensorrt",
+      "matcher": "pytorch (AssertionError compiling with Torch-TensorRT)",
+      "refiner": "pytorch (AttributeError compiling with Torch-TensorRT)",
+      "refiner2": "pytorch (AttributeError compiling with Torch-TensorRT)"
+    }
+  },
+  "seeds": [
+    1
+  ],
+  "mean": 50.95939040184021,
+  "std": null,
+  "min": 50.95939040184021,
+  "max": 50.95939040184021,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 50.95939040184021,
+      "seconds": 3392.8,
+      "empty_matches": 0,
+      "result": {
+        "avg_pck": [
+          0.0,
+          0.2185826152563095,
+          0.37168505787849426,
+          0.4781261086463928,
+          0.5484664440155029,
+          0.5964593291282654,
+          0.631462574005127,
+          0.6626794338226318,
+          0.683936595916748,
+          0.6997874975204468,
+          0.7143473625183105,
+          0.7263689041137695,
+          0.7397981286048889,
+          0.7478558421134949,
+          0.7571528553962708,
+          0.7633434534072876,
+          0.7701902985572815,
+          0.7775964736938477,
+          0.7835344672203064,
+          0.7882570028305054
+        ],
+        "mAA_10px": 0.5095939040184021
+      }
+    }
+  ]
+}

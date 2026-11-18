@@ -1,0 +1,313 @@
+{
+  "config": {
+    "tag": "c800x800_r1280x1280_bidir",
+    "coarse_size": [
+      800,
+      800
+    ],
+    "refine_size": [
+      1280,
+      1280
+    ],
+    "direction": "both",
+    "refiners": true
+  },
+  "pair": [
+    ".WxBS/v1.1/WGALBS/bridge/01.png",
+    ".WxBS/v1.1/WGALBS/bridge/02.png"
+  ],
+  "reference": "torch_fp32",
+  "output_grid": [
+    1280,
+    1280
+  ],
+  "variants": {
+    "torch_bf16": {
+      "match_ms": 1890.8,
+      "tag": "c800x800_r1280x1280_bidir",
+      "coarse_size": [
+        800,
+        800
+      ],
+      "refine_size": [
+        1280,
+        1280
+      ],
+      "direction": "both",
+      "refiners": true,
+      "num_corresp": 5000,
+      "backends": {
+        "encoder": "pytorch",
+        "matcher": "pytorch",
+        "refiner": "pytorch",
+        "refiner2": "pytorch"
+      },
+      "vs_reference": {
+        "AB": {
+          "finite": true,
+          "overlap_pixels": 16112,
+          "warp_err_px_mean": 0.2112307995557785,
+          "warp_err_px_median": 0.10836963355541229,
+          "warp_err_px_p99": 2.626617908477783,
+          "warp_err_px_max": 4.215755939483643,
+          "overlap_abs_diff_mean": 0.004558461252599955
+        },
+        "BA": {
+          "finite": true,
+          "overlap_pixels": 7703,
+          "warp_err_px_mean": 1.9768799543380737,
+          "warp_err_px_median": 0.33615800738334656,
+          "warp_err_px_p99": 67.93423461914062,
+          "warp_err_px_max": 90.07147216796875,
+          "overlap_abs_diff_mean": 0.005655164830386639
+        }
+      }
+    },
+    "onnx_gpu_fp32": {
+      "match_ms": 6171.9,
+      "tag": "c800x800_r1280x1280_bidir",
+      "coarse_size": [
+        800,
+        800
+      ],
+      "refine_size": [
+        1280,
+        1280
+      ],
+      "direction": "both",
+      "refiners": true,
+      "num_corresp": 5000,
+      "backends": {
+        "encoder": "onnxruntime",
+        "matcher": "onnxruntime",
+        "refiner": "onnxruntime",
+        "refiner2": "onnxruntime"
+      },
+      "vs_reference": {
+        "AB": {
+          "finite": true,
+          "overlap_pixels": 16112,
+          "warp_err_px_mean": 0.03573400899767876,
+          "warp_err_px_median": 0.027715586125850677,
+          "warp_err_px_p99": 0.1431482881307602,
+          "warp_err_px_max": 0.7032077312469482,
+          "overlap_abs_diff_mean": 0.000565170485060662
+        },
+        "BA": {
+          "finite": true,
+          "overlap_pixels": 7703,
+          "warp_err_px_mean": 0.3894472122192383,
+          "warp_err_px_median": 0.0412583127617836,
+          "warp_err_px_p99": 13.449928283691406,
+          "warp_err_px_max": 87.16771697998047,
+          "overlap_abs_diff_mean": 0.0012084380723536015
+        }
+      }
+    },
+    "trt_fp32": {
+      "match_ms": 3754.3,
+      "tag": "c800x800_r1280x1280_bidir",
+      "coarse_size": [
+        800,
+        800
+      ],
+      "refine_size": [
+        1280,
+        1280
+      ],
+      "direction": "both",
+      "refiners": true,
+      "num_corresp": 5000,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "vs_reference": {
+        "AB": {
+          "finite": true,
+          "overlap_pixels": 16112,
+          "warp_err_px_mean": 0.03577985242009163,
+          "warp_err_px_median": 0.027736810967326164,
+          "warp_err_px_p99": 0.14231081306934357,
+          "warp_err_px_max": 0.7051042914390564,
+          "overlap_abs_diff_mean": 0.0005659069283865392
+        },
+        "BA": {
+          "finite": true,
+          "overlap_pixels": 7703,
+          "warp_err_px_mean": 0.3644983172416687,
+          "warp_err_px_median": 0.04103771224617958,
+          "warp_err_px_p99": 12.350578308105469,
+          "warp_err_px_max": 44.24509811401367,
+          "overlap_abs_diff_mean": 0.0012091518146917224
+        }
+      }
+    },
+    "trt_fp32_tf32": {
+      "match_ms": 2821.4,
+      "tag": "c800x800_r1280x1280_bidir",
+      "coarse_size": [
+        800,
+        800
+      ],
+      "refine_size": [
+        1280,
+        1280
+      ],
+      "direction": "both",
+      "refiners": true,
+      "num_corresp": 5000,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "vs_reference": {
+        "AB": {
+          "finite": true,
+          "overlap_pixels": 16112,
+          "warp_err_px_mean": 0.07769978791475296,
+          "warp_err_px_median": 0.037713002413511276,
+          "warp_err_px_p99": 0.7665955424308777,
+          "warp_err_px_max": 1.5866395235061646,
+          "overlap_abs_diff_mean": 0.0014859018847346306
+        },
+        "BA": {
+          "finite": true,
+          "overlap_pixels": 7703,
+          "warp_err_px_mean": 2.263347625732422,
+          "warp_err_px_median": 0.12932202219963074,
+          "warp_err_px_p99": 81.49576568603516,
+          "warp_err_px_max": 282.24505615234375,
+          "overlap_abs_diff_mean": 0.003122668480500579
+        }
+      }
+    },
+    "trt_bf16": {
+      "match_ms": 937.1,
+      "tag": "c800x800_r1280x1280_bidir",
+      "coarse_size": [
+        800,
+        800
+      ],
+      "refine_size": [
+        1280,
+        1280
+      ],
+      "direction": "both",
+      "refiners": true,
+      "num_corresp": 5000,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "vs_reference": {
+        "AB": {
+          "finite": true,
+          "overlap_pixels": 16112,
+          "warp_err_px_mean": 0.2742967903614044,
+          "warp_err_px_median": 0.12867823243141174,
+          "warp_err_px_p99": 3.9027392864227295,
+          "warp_err_px_max": 6.306783199310303,
+          "overlap_abs_diff_mean": 0.0046089948154985905
+        },
+        "BA": {
+          "finite": true,
+          "overlap_pixels": 7703,
+          "warp_err_px_mean": 4.2044148445129395,
+          "warp_err_px_median": 0.2923937141895294,
+          "warp_err_px_p99": 163.05186462402344,
+          "warp_err_px_max": 248.63433837890625,
+          "overlap_abs_diff_mean": 0.005927484016865492
+        }
+      }
+    },
+    "trt_fp16enc_bf16": {
+      "match_ms": 881.1,
+      "tag": "c800x800_r1280x1280_bidir",
+      "coarse_size": [
+        800,
+        800
+      ],
+      "refine_size": [
+        1280,
+        1280
+      ],
+      "direction": "both",
+      "refiners": true,
+      "num_corresp": 5000,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "vs_reference": {
+        "AB": {
+          "finite": true,
+          "overlap_pixels": 16112,
+          "warp_err_px_mean": 0.21376267075538635,
+          "warp_err_px_median": 0.12484714388847351,
+          "warp_err_px_p99": 2.2775261402130127,
+          "warp_err_px_max": 4.250221252441406,
+          "overlap_abs_diff_mean": 0.005007279105484486
+        },
+        "BA": {
+          "finite": true,
+          "overlap_pixels": 7703,
+          "warp_err_px_mean": 3.411949396133423,
+          "warp_err_px_median": 0.4260437488555908,
+          "warp_err_px_p99": 66.08147430419922,
+          "warp_err_px_max": 166.9711151123047,
+          "overlap_abs_diff_mean": 0.005959627218544483
+        }
+      }
+    },
+    "trt_fp16": {
+      "match_ms": 686.7,
+      "tag": "c800x800_r1280x1280_bidir",
+      "coarse_size": [
+        800,
+        800
+      ],
+      "refine_size": [
+        1280,
+        1280
+      ],
+      "direction": "both",
+      "refiners": true,
+      "num_corresp": 5000,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "vs_reference": {
+        "AB": {
+          "finite": false,
+          "overlap_pixels": 16112,
+          "warp_err_px_mean": null,
+          "warp_err_px_median": null,
+          "warp_err_px_p99": null,
+          "warp_err_px_max": null,
+          "overlap_abs_diff_mean": NaN
+        },
+        "BA": {
+          "finite": false,
+          "overlap_pixels": 7703,
+          "warp_err_px_mean": null,
+          "warp_err_px_median": null,
+          "warp_err_px_p99": null,
+          "warp_err_px_max": null,
+          "overlap_abs_diff_mean": NaN
+        }
+      }
+    }
+  }
+}

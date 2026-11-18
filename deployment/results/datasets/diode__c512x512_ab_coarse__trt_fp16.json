@@ -1,0 +1,59 @@
+{
+  "dataset": "diode",
+  "variant": "trt_fp16",
+  "config": "c512x512_ab_coarse",
+  "metric": "auc@10",
+  "scale": "0-100",
+  "setting": {
+    "stage": "matcher",
+    "H_lr": 512,
+    "W_lr": 512,
+    "H_hr": null,
+    "W_hr": null,
+    "bidirectional": false,
+    "num_corresp": 2000
+  },
+  "seeds": [
+    1
+  ],
+  "mean": 0.0,
+  "std": null,
+  "min": 0.0,
+  "max": 0.0,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 0.0,
+      "seconds": 119.4,
+      "empty_matches": 880,
+      "result": {
+        "scenes": {
+          "DIO-depth": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 892,
+            "failed": 880,
+            "median_error_px": 326.00230407714844
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 0.0,
+          "auc@5": 0.0,
+          "auc@7": 0.0,
+          "auc@10": 0.0,
+          "auc@15": 0.0,
+          "auc@20": 0.0
+        },
+        "pairs": 892,
+        "failed": 880
+      }
+    }
+  ],
+  "variant_name_before_rename": "trt_fp16_coarse"
+}

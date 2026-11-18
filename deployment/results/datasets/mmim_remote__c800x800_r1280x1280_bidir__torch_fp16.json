@@ -1,0 +1,565 @@
+{
+  "dataset": "mmim_remote",
+  "variant": "torch_fp16",
+  "config": "c800x800_r1280x1280_bidir",
+  "metric": "auc@10",
+  "scale": "0-100",
+  "setting": {
+    "tag": "c800x800_r1280x1280_bidir",
+    "coarse_size": [
+      800,
+      800
+    ],
+    "refine_size": [
+      1280,
+      1280
+    ],
+    "direction": "both",
+    "refiners": true,
+    "num_corresp": 5000,
+    "backends": {
+      "encoder": "pytorch",
+      "matcher": "pytorch",
+      "refiner": "pytorch",
+      "refiner2": "pytorch"
+    }
+  },
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "mean": 1.6164475213913687,
+  "std": 1.9718002013835252,
+  "min": 0.0,
+  "max": 4.829851105099631,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 1.6225595474243166,
+      "seconds": 155.3,
+      "empty_matches": 27,
+      "result": {
+        "scenes": {
+          "RemoteSensing/SAR_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 10.004670355055065,
+            "auc@20": 11.670169432957966,
+            "pairs": 6,
+            "failed": 3,
+            "median_error_px": 319.8457946777344
+          },
+          "RemoteSensing/CrossSeason": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 11.357916831970217,
+            "auc@15": 14.23861122131348,
+            "auc@20": 15.67895841598511,
+            "pairs": 5,
+            "failed": 3,
+            "median_error_px": 153.50480318069458
+          },
+          "RemoteSensing/DayNight": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 5,
+            "failed": 4,
+            "median_error_px": 326.4619140625
+          },
+          "RemoteSensing/DepthOptical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 8,
+            "failed": 5,
+            "median_error_px": 57.601871490478516
+          },
+          "RemoteSensing/Infrared_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 4,
+            "failed": 2,
+            "median_error_px": 396.4483642578125
+          },
+          "RemoteSensing/Map_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 7,
+            "failed": 6,
+            "median_error_px": 605.7056884765625
+          },
+          "RemoteSensing/Optical_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 9.786016146341959,
+            "pairs": 6,
+            "failed": 4,
+            "median_error_px": 45.10042381286621
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 0.0,
+          "auc@5": 0.0,
+          "auc@7": 0.0,
+          "auc@10": 1.6225595474243166,
+          "auc@15": 3.4633259394812206,
+          "auc@20": 5.305020570755005
+        },
+        "pairs": 41,
+        "failed": 27
+      }
+    },
+    {
+      "seed": 2,
+      "headline": 0.0,
+      "seconds": 157.0,
+      "empty_matches": 27,
+      "result": {
+        "scenes": {
+          "RemoteSensing/SAR_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 10.82565360599094,
+            "auc@20": 12.285906871159872,
+            "pairs": 6,
+            "failed": 3,
+            "median_error_px": 365.75787353515625
+          },
+          "RemoteSensing/CrossSeason": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 10.90418306986491,
+            "auc@20": 13.178137302398682,
+            "pairs": 5,
+            "failed": 3,
+            "median_error_px": 191.29422903060913
+          },
+          "RemoteSensing/DayNight": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 5,
+            "failed": 4,
+            "median_error_px": 4065.564453125
+          },
+          "RemoteSensing/DepthOptical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 8,
+            "failed": 5,
+            "median_error_px": 143.63522338867188
+          },
+          "RemoteSensing/Infrared_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 4,
+            "failed": 2,
+            "median_error_px": 434.3027038574219
+          },
+          "RemoteSensing/Map_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 7,
+            "failed": 6,
+            "median_error_px": 736.2122192382812
+          },
+          "RemoteSensing/Optical_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 9.793416659037272,
+            "pairs": 6,
+            "failed": 4,
+            "median_error_px": 45.3228702545166
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 0.0,
+          "auc@5": 0.0,
+          "auc@7": 0.0,
+          "auc@10": 0.0,
+          "auc@15": 3.1042623822651216,
+          "auc@20": 5.036780118942261
+        },
+        "pairs": 41,
+        "failed": 27
+      }
+    },
+    {
+      "seed": 3,
+      "headline": 0.0,
+      "seconds": 153.3,
+      "empty_matches": 27,
+      "result": {
+        "scenes": {
+          "RemoteSensing/SAR_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 10.391395886739094,
+            "pairs": 6,
+            "failed": 3,
+            "median_error_px": 299.95526123046875
+          },
+          "RemoteSensing/CrossSeason": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 13.002391815185549,
+            "auc@20": 14.751793861389162,
+            "pairs": 5,
+            "failed": 3,
+            "median_error_px": 149.00318050384521
+          },
+          "RemoteSensing/DayNight": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 5,
+            "failed": 4,
+            "median_error_px": 925.9390258789062
+          },
+          "RemoteSensing/DepthOptical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 6.816282868385315,
+            "pairs": 8,
+            "failed": 5,
+            "median_error_px": 352.6112365722656
+          },
+          "RemoteSensing/Infrared_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 4,
+            "failed": 2,
+            "median_error_px": 1079.6909942626953
+          },
+          "RemoteSensing/Map_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 7,
+            "failed": 6,
+            "median_error_px": 819.26806640625
+          },
+          "RemoteSensing/Optical_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 10.346539417902626,
+            "pairs": 6,
+            "failed": 4,
+            "median_error_px": 61.88431215286255
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 0.0,
+          "auc@5": 0.0,
+          "auc@7": 0.0,
+          "auc@10": 0.0,
+          "auc@15": 1.857484545026507,
+          "auc@20": 6.043716004916599
+        },
+        "pairs": 41,
+        "failed": 27
+      }
+    },
+    {
+      "seed": 4,
+      "headline": 4.829851105099631,
+      "seconds": 153.3,
+      "empty_matches": 27,
+      "result": {
+        "scenes": {
+          "RemoteSensing/SAR_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 9.98883565266927,
+            "auc@15": 12.214779324001736,
+            "auc@20": 13.327751159667969,
+            "pairs": 6,
+            "failed": 3,
+            "median_error_px": 220.4566650390625
+          },
+          "RemoteSensing/CrossSeason": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 11.00543430873326,
+            "auc@10": 13.70380401611328,
+            "auc@15": 15.802536010742188,
+            "auc@20": 16.85190200805664,
+            "pairs": 5,
+            "failed": 3,
+            "median_error_px": 273.36523056030273
+          },
+          "RemoteSensing/DayNight": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 5,
+            "failed": 4,
+            "median_error_px": 630.0625610351562
+          },
+          "RemoteSensing/DepthOptical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 8,
+            "failed": 5,
+            "median_error_px": 54.77277374267578
+          },
+          "RemoteSensing/Infrared_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 4,
+            "failed": 2,
+            "median_error_px": 329.83387756347656
+          },
+          "RemoteSensing/Map_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 7,
+            "failed": 6,
+            "median_error_px": 310.5011291503906
+          },
+          "RemoteSensing/Optical_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 10.116318066914875,
+            "auc@15": 12.299767600165472,
+            "auc@20": 13.391492366790771,
+            "pairs": 6,
+            "failed": 4,
+            "median_error_px": 55.527018547058105
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 0.0,
+          "auc@5": 0.0,
+          "auc@7": 1.5722049012476087,
+          "auc@10": 4.829851105099631,
+          "auc@15": 5.759583276415627,
+          "auc@20": 6.224449362073626
+        },
+        "pairs": 41,
+        "failed": 27
+      }
+    },
+    {
+      "seed": 5,
+      "headline": 1.6298269544328965,
+      "seconds": 154.3,
+      "empty_matches": 27,
+      "result": {
+        "scenes": {
+          "RemoteSensing/SAR_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 10.252027908960978,
+            "pairs": 6,
+            "failed": 3,
+            "median_error_px": 330.9136047363281
+          },
+          "RemoteSensing/CrossSeason": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 11.408788681030275,
+            "auc@15": 14.272525787353516,
+            "auc@20": 15.704394340515137,
+            "pairs": 5,
+            "failed": 3,
+            "median_error_px": 139.47172260284424
+          },
+          "RemoteSensing/DayNight": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 5,
+            "failed": 4,
+            "median_error_px": 1006.2672119140625
+          },
+          "RemoteSensing/DepthOptical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 8,
+            "failed": 5,
+            "median_error_px": 172.65708923339844
+          },
+          "RemoteSensing/Infrared_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 4,
+            "failed": 2,
+            "median_error_px": 935.9209289550781
+          },
+          "RemoteSensing/Map_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 0.0,
+            "auc@20": 0.0,
+            "pairs": 7,
+            "failed": 6,
+            "median_error_px": 359.5386047363281
+          },
+          "RemoteSensing/Optical_Optical": {
+            "auc@1": 0.0,
+            "auc@3": 0.0,
+            "auc@5": 0.0,
+            "auc@7": 0.0,
+            "auc@10": 0.0,
+            "auc@15": 10.044660568237305,
+            "auc@20": 11.700162092844643,
+            "pairs": 6,
+            "failed": 4,
+            "median_error_px": 199.11144733428955
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 0.0,
+          "auc@5": 0.0,
+          "auc@7": 0.0,
+          "auc@10": 1.6298269544328965,
+          "auc@15": 3.4738837650844028,
+          "auc@20": 5.379512048902965
+        },
+        "pairs": 41,
+        "failed": 27
+      }
+    }
+  ]
+}

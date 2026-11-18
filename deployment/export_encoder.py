@@ -44,8 +44,8 @@ from common import (  # noqa: E402
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--checkpoint", default="vggtomega.pt", help="VGGT-Omega checkpoint")
-    p.add_argument("--height", type=int, default=512)
-    p.add_argument("--width", type=int, default=512)
+    p.add_argument("--height", type=int, default=800)
+    p.add_argument("--width", type=int, default=800)
     p.add_argument("--opset", type=int, default=18)
     p.add_argument(
         "--precision",

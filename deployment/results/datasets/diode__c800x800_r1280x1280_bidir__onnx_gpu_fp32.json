@@ -1,0 +1,69 @@
+{
+  "dataset": "diode",
+  "variant": "onnx_gpu_fp32",
+  "config": "c800x800_r1280x1280_bidir",
+  "metric": "auc@10",
+  "scale": "0-100",
+  "setting": {
+    "tag": "c800x800_r1280x1280_bidir",
+    "coarse_size": [
+      800,
+      800
+    ],
+    "refine_size": [
+      1280,
+      1280
+    ],
+    "direction": "both",
+    "refiners": true,
+    "num_corresp": 5000,
+    "backends": {
+      "encoder": "onnxruntime",
+      "matcher": "onnxruntime",
+      "refiner": "onnxruntime",
+      "refiner2": "onnxruntime"
+    }
+  },
+  "seeds": [
+    1
+  ],
+  "mean": 44.184890269164015,
+  "std": null,
+  "min": 44.184890269164015,
+  "max": 44.184890269164015,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 44.184890269164015,
+      "seconds": 5453.4,
+      "empty_matches": 0,
+      "result": {
+        "scenes": {
+          "DIO-depth": {
+            "auc@1": 0.11108341572530601,
+            "auc@3": 7.222406457001496,
+            "auc@5": 20.273635964757126,
+            "auc@7": 31.743551163548155,
+            "auc@10": 44.184890269164015,
+            "auc@15": 57.41893795751849,
+            "auc@20": 65.33052530523906,
+            "pairs": 892,
+            "failed": 0,
+            "median_error_px": 4.872411727905273
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.11108341572530601,
+          "auc@3": 7.222406457001496,
+          "auc@5": 20.273635964757126,
+          "auc@7": 31.743551163548155,
+          "auc@10": 44.184890269164015,
+          "auc@15": 57.41893795751849,
+          "auc@20": 65.33052530523906
+        },
+        "pairs": 892,
+        "failed": 0
+      }
+    }
+  ]
+}

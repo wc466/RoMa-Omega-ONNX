@@ -1,0 +1,59 @@
+{
+  "dataset": "diode",
+  "variant": "trt_fp32_tf32",
+  "config": "c512x512_ab_coarse",
+  "metric": "auc@10",
+  "scale": "0-100",
+  "setting": {
+    "stage": "matcher",
+    "H_lr": 512,
+    "W_lr": 512,
+    "H_hr": null,
+    "W_hr": null,
+    "bidirectional": false,
+    "num_corresp": 2000
+  },
+  "seeds": [
+    1
+  ],
+  "mean": 30.51388537402645,
+  "std": null,
+  "min": 30.51388537402645,
+  "max": 30.51388537402645,
+  "runs": [
+    {
+      "seed": 1,
+      "headline": 30.51388537402645,
+      "seconds": 461.9,
+      "empty_matches": 0,
+      "result": {
+        "scenes": {
+          "DIO-depth": {
+            "auc@1": 0.0,
+            "auc@3": 1.6340213506211079,
+            "auc@5": 8.51950986502951,
+            "auc@7": 17.2107714861345,
+            "auc@10": 30.51388537402645,
+            "auc@15": 45.809918654517375,
+            "auc@20": 55.81940481213711,
+            "pairs": 892,
+            "failed": 0,
+            "median_error_px": 7.060145378112793
+          }
+        },
+        "mean_over_scenes": {
+          "auc@1": 0.0,
+          "auc@3": 1.6340213506211079,
+          "auc@5": 8.51950986502951,
+          "auc@7": 17.2107714861345,
+          "auc@10": 30.51388537402645,
+          "auc@15": 45.809918654517375,
+          "auc@20": 55.81940481213711
+        },
+        "pairs": 892,
+        "failed": 0
+      }
+    }
+  ],
+  "variant_name_before_rename": "trt_fp32_tf32_coarse"
+}

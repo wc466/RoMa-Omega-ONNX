@@ -1,29 +1,24 @@
-"""Benchmark matchers: one adapter, several interchangeable backends.
+"""RoMa-Omega variants behind the repo's BenchmarkMatcher interface.
 
-Every variant shares upstream's image loading, resizing, confidence mapping,
-match sampling and pixel conversion (``VGGTRoMa.match`` / ``.sample`` /
-``.to_pixel_coordinates``). Variants differ only in pipeline scope and in what
-computes the network outputs:
+One PipelineConfig (pipeline.py: coarse size, refinement size, direction,
+refiners on/off) is shared by every variant; a variant chooses what executes
+it and at which precision:
 
-  torch_bf16_full    the released model as shipped: "precise" setting
-                     (800 coarse / 1280 refine), bidirectional, refiners,
-                     bf16 autocast. This is the reference.
-  torch_bf16_coarse  coarse matcher only, 512x512, one direction, bf16
-  torch_fp32_coarse  same, autocast disabled
-  torch_fp16_coarse  same, upstream's autocast forced to IEEE float16
-  onnx_fp32_coarse   fp32 encoder.onnx -> matcher.onnx on ONNX Runtime (CPU)
-  onnx_gpu_fp32_coarse  same graphs on ONNX Runtime's CUDA provider, TF32
-                     disabled (needs the onnxruntime-gpu package)
-  trt_fp32_coarse    TensorRT engines from the fp32 graphs, TF32 disabled
-  trt_fp32_tf32_coarse  same graphs, TensorRT default build (TF32 enabled)
-  trt_bf16_coarse    TensorRT engines from the bf16-compute graphs
-  trt_fp16_coarse    TensorRT engines from the fp16-compute graphs (the fp16
-                     matcher overflows to NaN, in PyTorch too; kept on record)
-  trt_fp16enc_bf16mat_coarse  fp16 encoder engine + bf16 matcher engine
-  torchtrt_fp32_coarse  PyTorch modules compiled with Torch-TensorRT, fp32,
-                     TF32 disabled (needs the separate Torch-TensorRT venv)
-  torchtrt_bf16_coarse  Torch-TensorRT bf16 encoder; the bf16 matcher stays in
-                     PyTorch (TensorRT has no bf16 ConvTranspose)
+  torch_bf16      upstream PyTorch model as released (fp32 weights, bf16 autocast)
+  torch_fp32      same, every autocast disabled
+  torch_fp16      same, upstream's autocast forced to IEEE float16
+  onnx_cpu_fp32   fp32 ONNX graphs on ONNX Runtime, CPU provider
+  onnx_gpu_fp32   fp32 ONNX graphs on ONNX Runtime's CUDA provider, TF32
+                  disabled (needs the onnxruntime-gpu package)
+  trt_fp32        TensorRT engines from the fp32 graphs, TF32 disabled
+  trt_fp32_tf32   same graphs, TensorRT default build (TF32 enabled)
+  trt_bf16        TensorRT engines from the bf16-compute graphs
+  trt_fp16        TensorRT engines from the fp16-compute graphs (the fp16
+                  matcher overflows to NaN, in PyTorch too; kept on record)
+  trt_fp16enc_bf16  fp16 encoder engine, bf16 engines for everything after it
+  torchtrt_fp32   PyTorch modules compiled with Torch-TensorRT, fp32, TF32
+                  disabled (needs the separate Torch-TensorRT environment)
+  torchtrt_bf16   same in bf16; modules TensorRT cannot compile stay in PyTorch
 """
 
 from __future__ import annotations
@@ -31,11 +26,11 @@ from __future__ import annotations
 import hashlib
 import sys
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -43,167 +38,264 @@ from common import (  # noqa: E402
     force_autocast_dtype,
     load_roma_omega,
     no_autocast,
+    refiner_io_names,
     set_matcher_amp,
+    tracing_context,
 )
+from pipeline import PipelineConfig  # noqa: E402
 
-VARIANTS = (
-    "torch_bf16_full",
-    "torch_bf16_coarse",
-    "torch_fp32_coarse",
-    "torch_fp16_coarse",
-    "onnx_fp32_coarse",
-    "onnx_gpu_fp32_coarse",
-    "trt_fp32_coarse",
-    "trt_fp32_tf32_coarse",
-    "trt_bf16_coarse",
-    "trt_fp16_coarse",
-    "trt_fp16enc_bf16mat_coarse",
-    "torchtrt_fp32_coarse",
-    "torchtrt_bf16_coarse",
-)
-TORCHTRT_VARIANTS = {"torchtrt_fp32_coarse": "fp32", "torchtrt_bf16_coarse": "bf16"}
-# Graph-backed variants: (encoder precision, matcher precision, file suffix).
-GRAPH_VARIANTS = {
-    "onnx_fp32_coarse": ("fp32", "fp32", ".onnx"),
-    "onnx_gpu_fp32_coarse": ("fp32", "fp32", ".onnx"),
-    "trt_fp32_coarse": ("fp32", "fp32", ".notf32.engine"),
-    "trt_fp32_tf32_coarse": ("fp32", "fp32", ".engine"),
-    "trt_bf16_coarse": ("bf16", "bf16", ".engine"),
-    "trt_fp16_coarse": ("fp16", "fp16", ".engine"),
-    "trt_fp16enc_bf16mat_coarse": ("fp16", "bf16", ".engine"),
-}
-# Upstream samples 5000 matches. Coarse-only at 512x512 the warp is a 128x128
-# grid (16384 cells) and VGGTRoMa.sample draws 4x the count without
-# replacement, so the coarse variants use 2000.
+TORCH_VARIANTS = {"torch_bf16": "bf16", "torch_fp32": "fp32", "torch_fp16": "fp16"}
 # ONNX Runtime execution provider per variant. The CUDA provider enables TF32
 # by default; it is disabled here to match the TensorRT --no-tf32 engines.
-ONNX_PROVIDERS = {
-    "onnx_fp32_coarse": "CPUExecutionProvider",
-    "onnx_gpu_fp32_coarse": ("CUDAExecutionProvider", {"use_tf32": "0"}),
+ONNX_VARIANTS = {
+    "onnx_cpu_fp32": "CPUExecutionProvider",
+    "onnx_gpu_fp32": ("CUDAExecutionProvider", {"use_tf32": "0"}),
 }
-DEFAULT_NUM_CORRESP = {"full": 5000, "coarse": 2000}
+# TensorRT variants: (encoder precision, precision of the other graphs, engine suffix).
+TRT_VARIANTS = {
+    "trt_fp32": ("fp32", "fp32", ".notf32.engine"),
+    "trt_fp32_tf32": ("fp32", "fp32", ".engine"),
+    "trt_bf16": ("bf16", "bf16", ".engine"),
+    "trt_fp16": ("fp16", "fp16", ".engine"),
+    "trt_fp16enc_bf16": ("fp16", "bf16", ".engine"),
+}
+TORCHTRT_VARIANTS = {"torchtrt_fp32": "fp32", "torchtrt_bf16": "bf16"}
+VARIANTS = (*TORCH_VARIANTS, *ONNX_VARIANTS, *TRT_VARIANTS, *TORCHTRT_VARIANTS)
+# Upstream samples 5000 matches per pair.
+DEFAULT_NUM_CORRESP = 5000
+# Graph outputs are cached per image pair (repeat seeds reuse them). A refined
+# 1280 px bidirectional prediction is ~80 MB, so the cache is bounded.
+CACHE_PAIRS = 160
 
 
-class _GraphCoarseMatcher(nn.Module):
-    """Drop-in for ``VGGTRoMa.matcher`` backed by exported graphs. Returns the
-    keys VGGTRoMa.forward reads in stage="matcher". Subclasses implement
-    ``_run(img_A, img_B) -> (warp, confidence)`` as numpy arrays.
+def engine_path(onnx_path: Path, suffix: str) -> Path:
+    return onnx_path.with_name(onnx_path.stem + suffix)
 
-    The graphs are deterministic, so outputs are cached per input pair: repeat
-    runs over the same images with different seeds reuse them.
+
+class OnnxRunner:
+    """One ONNX graph on ONNX Runtime; torch CUDA tensors in and out."""
+
+    def __init__(self, path: Path, provider="CPUExecutionProvider"):
+        import onnxruntime as ort
+
+        self.sess = ort.InferenceSession(str(path), providers=[provider])
+        # ONNX Runtime falls back to CPU silently if a provider fails to load.
+        wanted = provider if isinstance(provider, str) else provider[0]
+        assert self.sess.get_providers()[0] == wanted, self.sess.get_providers()
+        self.gpu = wanted != "CPUExecutionProvider"
+        self.input_names = [i.name for i in self.sess.get_inputs()]
+        self.shapes = {i.name: tuple(i.shape) for i in self.sess.get_inputs()}
+        self.output_names = [o.name for o in self.sess.get_outputs()]
+        if self.gpu:
+            # Bind torch tensors directly so nothing is copied through the host.
+            self.outputs = {
+                o.name: torch.empty(tuple(o.shape), dtype=torch.float32, device="cuda")
+                for o in self.sess.get_outputs()
+            }
+
+    def __call__(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        if not self.gpu:
+            feed = {n: inputs[n].float().cpu().numpy() for n in self.input_names}
+            out = self.sess.run(None, feed)
+            return {n: torch.from_numpy(o).cuda() for n, o in zip(self.output_names, out)}
+        binding = self.sess.io_binding()
+        held = []
+        for n in self.input_names:
+            t = inputs[n].to(device="cuda", dtype=torch.float32).contiguous()
+            assert tuple(t.shape) == self.shapes[n], (n, t.shape, self.shapes[n])
+            held.append(t)
+            binding.bind_input(n, "cuda", 0, np.float32, tuple(t.shape), t.data_ptr())
+        for n, t in self.outputs.items():
+            binding.bind_output(n, "cuda", 0, np.float32, tuple(t.shape), t.data_ptr())
+        torch.cuda.synchronize()  # inputs are ready
+        self.sess.run_with_iobinding(binding)
+        binding.synchronize_outputs()
+        return self.outputs
+
+
+class TorchRunner:
+    """A PyTorch (or Torch-TensorRT compiled) module with named inputs/outputs."""
+
+    def __init__(self, module, input_names, output_names, precision: str):
+        self.module, self.precision = module, precision
+        self.input_names, self.output_names = list(input_names), list(output_names)
+
+    def __call__(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        with torch.inference_mode(), tracing_context(self.precision):
+            out = self.module(*[inputs[n].float() for n in self.input_names])
+        out = out if isinstance(out, (tuple, list)) else (out,)
+        return {n: o.float() for n, o in zip(self.output_names, out)}
+
+
+class GraphPipeline:
+    """Chain of per-stage runners with the call signature of ``VGGTRoMa.forward``.
+
+    ``runners`` maps each stage of ``cfg.stages`` to a callable taking and
+    returning a dict of named CUDA tensors. Returns the keys ``VGGTRoMa.match``
+    reads: warp/confidence for A->B, and for B->A (None when one-directional).
     """
 
-    input_shape: tuple
+    def __init__(self, cfg: PipelineConfig, runners: dict, backends: dict | None = None):
+        assert tuple(runners) == cfg.stages, (tuple(runners), cfg.stages)
+        self.cfg, self.runners = cfg, runners
+        self.backends = backends or {}
+        self.seconds: dict[str, list[float]] = {s: [] for s in cfg.stages}
+        self.timing = False
+        self._cache: OrderedDict[str, dict] = OrderedDict()
+        self.use_cache = True
 
-    def __init__(self):
-        super().__init__()
-        self._cache: dict[str, tuple] = {}
-        self.seconds: list[float] = []
+    def _run_stage(self, stage: str, inputs: dict) -> dict:
+        if not self.timing:
+            return self.runners[stage](inputs)
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        out = self.runners[stage](inputs)
+        torch.cuda.synchronize()
+        self.seconds[stage].append((time.perf_counter() - t0) * 1e3)
+        return out
 
-    def _run(self, img_A: torch.Tensor, img_B: torch.Tensor):
-        raise NotImplementedError
+    def run(self, img_A_lr, img_B_lr, img_A_hr=None, img_B_hr=None) -> dict[str, torch.Tensor]:
+        cfg = self.cfg
+        assert tuple(img_A_lr.shape[-2:]) == cfg.coarse, (img_A_lr.shape, cfg.coarse)
+        feats = self._run_stage("encoder", {"img_A": img_A_lr, "img_B": img_B_lr})
+        out = self._run_stage("matcher", feats)
+        if cfg.refiners:
+            out = self._run_stage(
+                "refiner",
+                {"img_A": img_A_lr, "img_B": img_B_lr, **{f"prev_{k}": v for k, v in out.items()}},
+            )
+            if cfg.refine is not None:
+                assert tuple(img_A_hr.shape[-2:]) == cfg.refine, (img_A_hr.shape, cfg.refine)
+                out = self._run_stage(
+                    "refiner2",
+                    {"img_A": img_A_hr, "img_B": img_B_hr, **{f"prev_{k}": v for k, v in out.items()}},
+                )
+        return out
 
-    def forward(self, img_A: torch.Tensor, img_B: torch.Tensor, bidirectional: bool):
-        assert not bidirectional, "matcher graph was exported one-directional"
-        assert tuple(img_A.shape) == self.input_shape, (img_A.shape, self.input_shape)
-        key = hashlib.sha1(
-            img_A.float().cpu().numpy().tobytes() + img_B.float().cpu().numpy().tobytes()
-        ).hexdigest()
-        if key not in self._cache:
-            t0 = time.time()
-            self._cache[key] = self._run(img_A, img_B)
-            self.seconds.append(time.time() - t0)
-        warp, conf = self._cache[key]
+    def forward(self, img_A_lr, img_B_lr, img_A_hr=None, img_B_hr=None):
+        """Drop-in for ``VGGTRoMa.forward`` in eval mode."""
+        key = None
+        if self.use_cache:
+            key = hashlib.sha1(
+                img_A_lr.float().cpu().numpy().tobytes() + img_B_lr.float().cpu().numpy().tobytes()
+            ).hexdigest()
+        if key is not None and key in self._cache:
+            self._cache.move_to_end(key)
+            out = {k: v.to(img_A_lr.device) for k, v in self._cache[key].items()}
+        else:
+            out = self.run(img_A_lr, img_B_lr, img_A_hr, img_B_hr)
+            # Runners reuse their output buffers: copy what is kept.
+            out = {k: v.float().clone() for k, v in out.items()}
+            if key is not None:
+                self._cache[key] = {k: v.cpu() for k, v in out.items()}
+                while len(self._cache) > CACHE_PAIRS:
+                    self._cache.popitem(last=False)
         return {
-            "warp_AB": torch.from_numpy(warp).to(img_A.device),
-            "confidence_AB": torch.from_numpy(conf).to(img_A.device),
-            "warp_BA": None,
-            "confidence_BA": None,
+            "warp_AB": out["warp_AB"],
+            "confidence_AB": out["confidence_AB"],
+            "warp_BA": out.get("warp_BA"),
+            "confidence_BA": out.get("confidence_BA"),
         }
 
 
-class OnnxCoarseMatcher(_GraphCoarseMatcher):
-    def __init__(self, encoder: Path, matcher: Path, provider="CPUExecutionProvider"):
-        super().__init__()
-        import onnxruntime as ort
-
-        self.encoder = ort.InferenceSession(str(encoder), providers=[provider])
-        self.matcher = ort.InferenceSession(str(matcher), providers=[provider])
-        # ONNX Runtime falls back to CPU silently if a provider fails to load.
-        wanted = provider if isinstance(provider, str) else provider[0]
-        assert self.encoder.get_providers()[0] == wanted, self.encoder.get_providers()
-        self.feat_names = [i.name for i in self.matcher.get_inputs()]
-        assert [o.name for o in self.encoder.get_outputs()] == self.feat_names
-        self.input_shape = tuple(self.encoder.get_inputs()[0].shape)
-
-    def _run(self, img_A, img_B):
-        a, b = img_A.float().cpu().numpy(), img_B.float().cpu().numpy()
-        feats = self.encoder.run(None, {"img_A": a, "img_B": b})
-        warp, conf = self.matcher.run(None, dict(zip(self.feat_names, feats)))
-        return warp, conf
+def build_onnx_pipeline(cfg: PipelineConfig, variant: str, artifacts: Path) -> GraphPipeline:
+    runners = {}
+    for stage in cfg.stages:
+        path = cfg.graph_path(stage, "fp32", artifacts)
+        assert path.exists(), f"{variant}: missing {path}"
+        runners[stage] = OnnxRunner(path, ONNX_VARIANTS[variant])
+    return GraphPipeline(cfg, runners, {s: "onnxruntime" for s in cfg.stages})
 
 
-class TrtCoarseMatcher(_GraphCoarseMatcher):
-    def __init__(self, encoder_engine: Path, matcher_engine: Path):
-        super().__init__()
-        from trt_common import TrtRunner
-
-        self.encoder = TrtRunner(encoder_engine)
-        self.matcher = TrtRunner(matcher_engine)
-        self.input_shape = self.encoder.shapes["img_A"]
-
-    def _run(self, img_A, img_B):
-        feats = self.encoder({"img_A": img_A.float(), "img_B": img_B.float()})
-        out = self.matcher(feats)
-        return (
-            out["warp_AB"].float().cpu().numpy().copy(),
-            out["confidence_AB"].float().cpu().numpy().copy(),
+def trt_engine_paths(cfg: PipelineConfig, variant: str, artifacts: Path) -> dict[str, Path]:
+    enc_prec, rest_prec, suffix = TRT_VARIANTS[variant]
+    return {
+        stage: engine_path(
+            cfg.graph_path(stage, enc_prec if stage == "encoder" else rest_prec, artifacts), suffix
         )
+        for stage in cfg.stages
+    }
 
 
-class TorchTrtCoarseMatcher(_GraphCoarseMatcher):
-    """Encoder and matcher compiled straight from the PyTorch modules with
-    Torch-TensorRT (no ONNX). If the matcher cannot be compiled at the requested
-    precision it stays a PyTorch module and ``matcher_backend`` says so."""
+def build_trt_pipeline(cfg: PipelineConfig, variant: str, artifacts: Path) -> GraphPipeline:
+    from trt_common import TrtRunner
 
-    def __init__(self, torch_matcher: nn.Module, precision: str, height: int, width: int):
-        super().__init__()
-        import torch_tensorrt
+    runners = {}
+    for stage, path in trt_engine_paths(cfg, variant, artifacts).items():
+        assert path.exists(), f"{variant}: missing {path}"
+        runners[stage] = TrtRunner(path)
+    return GraphPipeline(cfg, runners, {s: "tensorrt" for s in cfg.stages})
 
-        from common import EMBED_DIM, PATCH_SIZE, EncoderWrapper, MatcherWrapper, tracing_context
 
-        self.precision = precision
-        self._ctx = lambda: tracing_context(precision)
-        amp = precision != "fp32"
-        encoder = EncoderWrapper(torch_matcher.vggt.aggregator, amp=amp).eval()
-        matcher = MatcherWrapper(torch_matcher, amp=amp).eval()
-        imgs = tuple(torch.rand(1, 3, height, width, device="cuda") for _ in range(2))
-        feats = tuple(
-            torch.randn(1, 2, height // PATCH_SIZE, width // PATCH_SIZE, 2 * EMBED_DIM, device="cuda")
-            for _ in matcher.layers
+def build_torchtrt_pipeline(cfg: PipelineConfig, variant: str, model) -> GraphPipeline:
+    """Compile each stage straight from the PyTorch modules with Torch-TensorRT
+    (no ONNX). A stage that cannot be compiled stays a PyTorch module; the
+    returned pipeline's ``backends`` says which."""
+    import torch_tensorrt
+
+    from common import (
+        EMBED_DIM,
+        PATCH_SIZE,
+        EncoderWrapper,
+        MatcherWrapper,
+        RefinerStageWrapper,
+        matcher_output_names,
+        output_names,
+    )
+
+    precision = TORCHTRT_VARIANTS[variant]
+    amp = precision != "fp32"
+    (ch, cw), bidir = cfg.coarse, cfg.bidirectional
+    n_dir = 2 if bidir else 1
+    img = lambda h, w: torch.rand(1, 3, h, w, device="cuda")  # noqa: E731
+    matcher = MatcherWrapper(model.matcher, bidirectional=bidir, amp=amp).eval()
+    feat_names = output_names(matcher.layers)
+    ref_in, ref_out = refiner_io_names(bidir)
+
+    def prev(h, w, c):
+        out = []
+        for _ in range(n_dir):
+            out += [torch.rand(1, h, w, 2, device="cuda") * 2 - 1, torch.randn(1, h, w, c, device="cuda")]
+        return out
+
+    stages = {
+        "encoder": (
+            EncoderWrapper(model.matcher.vggt.aggregator, amp=amp).eval(),
+            (img(ch, cw), img(ch, cw)), ["img_A", "img_B"], feat_names,
+        ),
+        "matcher": (
+            matcher,
+            tuple(torch.randn(1, 2, ch // PATCH_SIZE, cw // PATCH_SIZE, 2 * EMBED_DIM, device="cuda")
+                  for _ in feat_names),
+            feat_names, matcher_output_names(bidir),
+        ),
+    }
+    if cfg.refiners:
+        stages["refiner"] = (
+            RefinerStageWrapper(model, bidir, second_pass=False).eval(),
+            (img(ch, cw), img(ch, cw), *prev(ch // 4, cw // 4, 1)), ref_in, ref_out,
         )
+        if cfg.refine is not None:
+            rh, rw = cfg.refine
+            stages["refiner2"] = (
+                RefinerStageWrapper(model, bidir, second_pass=True).eval(),
+                (img(rh, rw), img(rh, rw), *prev(ch, cw, 4)), ref_in, ref_out,
+            )
 
-        def compile_(module, inputs):
-            with self._ctx():
-                program = torch.export.export(module, inputs)
-                return torch_tensorrt.dynamo.compile(
-                    program, inputs=list(inputs), min_block_size=1, disable_tf32=True
-                )
-
-        self.encoder = compile_(encoder, imgs)
+    runners, backends = {}, {}
+    for stage, (module, example, names_in, names_out) in stages.items():
         try:
-            self.matcher = compile_(matcher, feats)
-            self.matcher_backend = "torch_tensorrt"
+            with tracing_context(precision):
+                program = torch.export.export(module, tuple(example))
+                compiled = torch_tensorrt.dynamo.compile(
+                    program, inputs=list(example), min_block_size=1, disable_tf32=True
+                )
+            backends[stage] = "torch_tensorrt"
         except Exception as e:  # noqa: BLE001 - recorded, then fall back
-            self.matcher = matcher
-            self.matcher_backend = f"pytorch ({type(e).__name__} compiling with Torch-TensorRT)"
-        self.input_shape = (1, 3, height, width)
-
-    def _run(self, img_A, img_B):
-        with torch.inference_mode(), self._ctx():
-            feats = self.encoder(img_A.float(), img_B.float())
-            warp, conf = self.matcher(*[f.float() for f in feats])
-        return warp.float().cpu().numpy().copy(), conf.float().cpu().numpy().copy()
+            compiled = module
+            backends[stage] = f"pytorch ({type(e).__name__} compiling with Torch-TensorRT)"
+        runners[stage] = TorchRunner(compiled, names_in, names_out, precision)
+    return GraphPipeline(cfg, runners, backends)
 
 
 def _image_size(img) -> tuple[int, int]:
@@ -215,70 +307,73 @@ def _image_size(img) -> tuple[int, int]:
     return img.shape[1], img.shape[0]
 
 
+def apply_config(model, cfg: PipelineConfig) -> None:
+    """Put an upstream VGGTRoMa instance into ``cfg`` (what apply_setting does
+    for the named presets)."""
+    model.stage = "inference" if cfg.refiners else "matcher"
+    model.H_lr, model.W_lr = cfg.coarse
+    model.H_hr, model.W_hr = cfg.refine if cfg.refine is not None else (None, None)
+    model.bidirectional = cfg.bidirectional
+    model.threshold = None
+    model.balanced_sampling = True
+
+
 class RoMaOmegaVariants:
     """Holds one upstream model and switches it between variants.
 
     ``select(variant)`` returns an object with the repo's BenchmarkMatcher
     interface (``match`` -> pixel keypoints, ``offset``), whose ``match`` also
     accepts PIL images and HWC uint8 RGB arrays (needed for benchmarks that warp
-    images in memory).
+    images in memory). Image loading, resizing, confidence mapping and match
+    sampling are always upstream's own code; only ``forward`` is swapped.
     """
 
     def __init__(
         self,
+        cfg: PipelineConfig | None = None,
         artifacts: Path = Path("deployment/artifacts"),
-        size: str = "512x512",
         num_corresp: int | None = None,
     ):
+        self.cfg = cfg or PipelineConfig()
         self.model = load_roma_omega()
-        self.torch_matcher = self.model.matcher
-        self.artifacts, self.size = Path(artifacts), size
-        self.num_corresp = num_corresp
-        self._graph_matchers: dict[str, _GraphCoarseMatcher] = {}
+        self.artifacts = Path(artifacts)
+        self.num_corresp = num_corresp or DEFAULT_NUM_CORRESP
+        self._pipelines: dict[str, GraphPipeline] = {}
         self.reduced_count_matches = 0
         self.empty_matches = 0
 
-    def _graph_matcher(self, variant: str) -> _GraphCoarseMatcher:
-        if variant not in self._graph_matchers and variant in TORCHTRT_VARIANTS:
-            self._graph_matchers[variant] = TorchTrtCoarseMatcher(
-                self.torch_matcher, TORCHTRT_VARIANTS[variant], self.model.H_lr, self.model.W_lr
-            )
-        if variant not in self._graph_matchers:
-            enc_prec, mat_prec, suffix = GRAPH_VARIANTS[variant]
-            encoder = self.artifacts / f"encoder_{self.size}_{enc_prec}" / f"encoder{suffix}"
-            matcher = self.artifacts / f"matcher_{self.size}_{mat_prec}" / f"matcher{suffix}"
-            assert encoder.exists() and matcher.exists(), f"{variant}: missing {encoder} or {matcher}"
-            if suffix == ".onnx":
-                self._graph_matchers[variant] = OnnxCoarseMatcher(encoder, matcher, ONNX_PROVIDERS[variant])
+    def pipeline(self, variant: str) -> GraphPipeline:
+        if variant not in self._pipelines:
+            if variant in ONNX_VARIANTS:
+                p = build_onnx_pipeline(self.cfg, variant, self.artifacts)
+            elif variant in TRT_VARIANTS:
+                p = build_trt_pipeline(self.cfg, variant, self.artifacts)
             else:
-                self._graph_matchers[variant] = TrtCoarseMatcher(encoder, matcher)
-        return self._graph_matchers[variant]
+                p = build_torchtrt_pipeline(self.cfg, variant, self.model)
+            self._pipelines[variant] = p
+        return self._pipelines[variant]
+
+    def release(self, variant: str) -> None:
+        """Drop a graph pipeline (sessions, engines, cached outputs)."""
+        if self._pipelines.pop(variant, None) is not None:
+            self.model.__dict__.pop("forward", None)
+            torch.cuda.empty_cache()
 
     def select(self, variant: str):
         assert variant in VARIANTS, variant
         from romaomega.types import BenchmarkMatcher
 
         model, owner = self.model, self
-        scope = "full" if variant.endswith("_full") else "coarse"
-        fp32 = variant == "torch_fp32_coarse"
-        fp16 = variant == "torch_fp16_coarse"
-        num_corresp = self.num_corresp or DEFAULT_NUM_CORRESP[scope]
+        precision = TORCH_VARIANTS.get(variant)
+        num_corresp = self.num_corresp
 
         # Restore upstream state, then apply this variant.
-        model.matcher = self.torch_matcher
-        set_matcher_amp(self.torch_matcher, True)
-        if scope == "full":
-            model.stage = "inference"
-            model.apply_setting("precise")
-        else:
-            model.stage = "matcher"
-            model.apply_setting("fast")
-            if variant in GRAPH_VARIANTS or variant in TORCHTRT_VARIANTS:
-                gm = self._graph_matcher(variant)
-                assert gm.input_shape == (1, 3, model.H_lr, model.W_lr), gm.input_shape
-                model.matcher = gm
-            elif fp32:
-                set_matcher_amp(self.torch_matcher, False)
+        model.__dict__.pop("forward", None)
+        set_matcher_amp(model.matcher, precision != "fp32")
+        apply_config(model, self.cfg)
+        if precision is None:
+            # Instance attribute shadows VGGTRoMa.forward; upstream is not edited.
+            model.forward = self.pipeline(variant).forward
 
         class Selected(BenchmarkMatcher):
             @property
@@ -287,32 +382,36 @@ class RoMaOmegaVariants:
 
             @torch.inference_mode()
             def match(self, img_A, img_B):
-                if fp32:
+                if precision == "fp32":
                     with no_autocast():
                         preds = model.match(img_A, img_B)
-                elif fp16:
+                elif precision == "fp16":
                     with force_autocast_dtype(torch.float16):
                         preds = model.match(img_A, img_B)
                 else:
                     preds = model.match(img_A, img_B)
-                n = num_corresp
-                if not model.bidirectional:
-                    # Same border mask VGGTRoMa.sample applies before sampling;
-                    # sample() draws 4n candidates without replacement.
-                    H_A = preds["warp_AB"].shape[1]
-                    inside = preds["warp_AB"][0].abs().amax(dim=-1).le(1 - 1 / H_A)
-                    usable = int(((preds["overlap_AB"][0, ..., 0] > 0) & inside).sum())
-                    if not (torch.isfinite(preds["warp_AB"]).all() and torch.isfinite(preds["overlap_AB"]).all()):
-                        # Partly NaN output: sampling from it trips a device-side assert.
-                        usable = 0
-                    n = min(num_corresp, usable // 4)
-                    if n < num_corresp:
-                        owner.reduced_count_matches += 1
-                    if n == 0:
-                        # No usable prediction (e.g. NaN output from an fp16
-                        # overflow): report no matches instead of crashing.
-                        owner.empty_matches += 1
-                        return np.zeros((0, 2), np.float32), np.zeros((0, 2), np.float32)
+                # Same border mask VGGTRoMa.sample applies before sampling;
+                # sample() draws 4n candidates without replacement.
+                H_A = preds["warp_AB"].shape[1]
+                usable, finite = 0, True
+                for d in owner.cfg.directions:
+                    warp, overlap = preds[f"warp_{d}"], preds[f"overlap_{d}"]
+                    inside = warp[0].abs().amax(dim=-1).le(1 - 1 / H_A)
+                    usable += int(((overlap[0, ..., 0] > 0) & inside).sum())
+                    finite &= bool(torch.isfinite(warp).all() and torch.isfinite(overlap).all())
+                    if "precision_" + d in preds:
+                        finite &= bool(torch.isfinite(preds["precision_" + d]).all())
+                if not finite:
+                    # Partly NaN output: sampling from it trips a device-side assert.
+                    usable = 0
+                n = min(num_corresp, usable // 4)
+                if n < num_corresp:
+                    owner.reduced_count_matches += 1
+                if n == 0:
+                    # No usable prediction (e.g. NaN output from an fp16
+                    # overflow): report no matches instead of crashing.
+                    owner.empty_matches += 1
+                    return np.zeros((0, 2), np.float32), np.zeros((0, 2), np.float32)
                 matches = model.sample(preds, n)[0]
                 w1, h1 = _image_size(img_A)
                 w2, h2 = _image_size(img_B)
@@ -330,19 +429,9 @@ class RoMaOmegaVariants:
         return Selected()
 
     def describe(self, variant: str) -> dict:
-        m = self.model
-        extra = {}
-        gm = self._graph_matchers.get(variant)
-        if isinstance(gm, TorchTrtCoarseMatcher):
-            extra["matcher_backend"] = gm.matcher_backend
+        p = self._pipelines.get(variant)
         return {
-            **extra,
-            "stage": m.stage,
-            "H_lr": m.H_lr,
-            "W_lr": m.W_lr,
-            "H_hr": m.H_hr,
-            "W_hr": m.W_hr,
-            "bidirectional": m.bidirectional,
-            "num_corresp": self.num_corresp
-            or DEFAULT_NUM_CORRESP["full" if variant.endswith("_full") else "coarse"],
+            **self.cfg.describe(),
+            "num_corresp": self.num_corresp,
+            "backends": p.backends if p is not None else {s: "pytorch" for s in self.cfg.stages},
         }

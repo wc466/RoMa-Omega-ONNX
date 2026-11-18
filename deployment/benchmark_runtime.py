@@ -1,10 +1,9 @@
-"""Latency and memory at batch 1 for every coarse-matcher backend.
+"""Latency and memory at batch 1 for every backend of one pipeline configuration.
 
 Each variant runs in a fresh subprocess, on an otherwise idle GPU, with one
-real image pair at 512x512. Scope is the network only (encoder + matcher):
-no image loading, resizing or match sampling. ``torch_bf16_full`` additionally
-times the released full pipeline forward (800 coarse / 1280 refine,
-bidirectional, refiners) for context.
+real image pair. Scope is the network only (every graph of the pipeline, see
+pipeline.py; defaults are upstream's ``precise`` setting): no image loading,
+resizing or match sampling.
 
 Memory, per variant:
   system_peak_mb  peak drop in system MemAvailable while the process runs.
@@ -20,7 +19,7 @@ Run from the repository root:
 
     python deployment/benchmark_runtime.py
     .venv-torchtrt/bin/python deployment/benchmark_runtime.py \
-        --variants torchtrt_fp32_coarse,torchtrt_bf16_coarse --append
+        --variants torchtrt_fp32,torchtrt_bf16 --append
 """
 
 from __future__ import annotations
@@ -36,21 +35,21 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from pipeline import PipelineConfig  # noqa: E402
 
 DEFAULT_VARIANTS = (
-    "torch_bf16_full",
-    "torch_fp32_coarse",
-    "torch_bf16_coarse",
-    "onnx_fp32_coarse",
-    "onnx_gpu_fp32_coarse",
-    "trt_fp32_coarse",
-    "trt_fp32_tf32_coarse",
-    "trt_bf16_coarse",
-    "trt_fp16enc_bf16mat_coarse",
-    "trt_fp16_coarse",
+    "torch_bf16",
+    "torch_fp32",
+    "onnx_gpu_fp32",
+    "trt_fp32",
+    "trt_fp32_tf32",
+    "trt_bf16",
+    "trt_fp16enc_bf16",
+    "trt_fp16",
 )
-ARTIFACTS = Path("deployment/artifacts")
-SIZE = "512x512"
+IMAGES = (".WxBS/v1.1/WGALBS/bridge/01.png", ".WxBS/v1.1/WGALBS/bridge/02.png")
+# Variants slower than this per pair are timed with fewer runs.
+SLOW_MS, SLOW_RUNS = 3000.0, 5
 
 
 def mem_available_mb() -> float:
@@ -71,21 +70,46 @@ def stats(samples: list[float]) -> dict:
     }
 
 
-def child(variant: str, warmup: int, runs: int) -> dict:
-    import torch
+def child(variant: str, cfg: PipelineConfig, artifacts: Path, warmup: int, runs: int) -> dict:
+    import contextlib
 
-    from common import load_image
-    from matchers import GRAPH_VARIANTS, TORCHTRT_VARIANTS
+    import numpy as np
+    import torch
+    import torch.nn.functional as F
+    from PIL import Image
+
+    from matchers import (
+        ONNX_VARIANTS,
+        TORCH_VARIANTS,
+        TRT_VARIANTS,
+        build_onnx_pipeline,
+        build_torchtrt_pipeline,
+        build_trt_pipeline,
+        trt_engine_paths,
+    )
 
     torch.cuda.init()
     torch.zeros(1, device="cuda")
     free0 = torch.cuda.mem_get_info()[0]
 
-    a = torch.from_numpy(load_image(".WxBS/v1.1/WGALBS/bridge/01.png", 512, 512)).cuda()
-    b = torch.from_numpy(load_image(".WxBS/v1.1/WGALBS/bridge/02.png", 512, 512)).cuda()
+    def load(path, size):
+        # Same preprocessing as VGGTRoMa.match: [0, 1] RGB, antialiased bicubic resize.
+        img = torch.from_numpy(np.array(Image.open(path).convert("RGB"))).permute(2, 0, 1).cuda()
+        return F.interpolate(img.float()[None] / 255.0, size=size, mode="bicubic",
+                             align_corners=False, antialias=True)
+
+    lr = [load(p, cfg.coarse) for p in IMAGES]
+    hr = [load(p, cfg.refine) for p in IMAGES] if cfg.refine is not None else [None, None]
     disk, parts, extra = 0.0, {}, {}
 
-    def timed(fn, n_warm=warmup, n=runs):
+    def timed(fn):
+        fn()
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        fn()
+        torch.cuda.synchronize()
+        first = (time.perf_counter() - t0) * 1e3
+        n_warm, n = (0, SLOW_RUNS) if first > SLOW_MS else (warmup, runs)
         for _ in range(n_warm):
             fn()
         torch.cuda.synchronize()
@@ -95,104 +119,58 @@ def child(variant: str, warmup: int, runs: int) -> dict:
             fn()
             torch.cuda.synchronize()
             out.append((time.perf_counter() - t0) * 1e3)
-        return stats(out)
+        return stats(out), n
 
-    if variant in GRAPH_VARIANTS:
-        enc_prec, mat_prec, suffix = GRAPH_VARIANTS[variant]
-        enc_path = ARTIFACTS / f"encoder_{SIZE}_{enc_prec}" / f"encoder{suffix}"
-        mat_path = ARTIFACTS / f"matcher_{SIZE}_{mat_prec}" / f"matcher{suffix}"
-        if suffix == ".onnx":
-            import onnxruntime as ort
+    def file_size(p: Path) -> int:
+        data = Path(str(p) + ".data")
+        return p.stat().st_size + (data.stat().st_size if data.exists() else 0)
 
-            disk = sum(Path(str(p) + ".data").stat().st_size + p.stat().st_size for p in (enc_path, mat_path))
-            from matchers import ONNX_PROVIDERS
-
-            provider = ONNX_PROVIDERS[variant]
-            on_gpu = provider != "CPUExecutionProvider"
-            enc = ort.InferenceSession(str(enc_path), providers=[provider])
-            mat = ort.InferenceSession(str(mat_path), providers=[provider])
-            assert (enc.get_providers()[0] == "CUDAExecutionProvider") == on_gpu, enc.get_providers()
-            n_warm, n = (warmup, runs) if on_gpu else (1, 5)
-            an, bn = a.cpu().numpy(), b.cpu().numpy()
-            names = [i.name for i in mat.get_inputs()]
-            feats = enc.run(None, {"img_A": an, "img_B": bn})
-            parts["encoder"] = timed(lambda: enc.run(None, {"img_A": an, "img_B": bn}), n_warm, n)
-            parts["matcher"] = timed(lambda: mat.run(None, dict(zip(names, feats))), n_warm, n)
-            total = timed(
-                lambda: mat.run(None, dict(zip(names, enc.run(None, {"img_A": an, "img_B": bn})))), n_warm, n
-            )
-            extra["device"] = "GPU (CUDA provider, TF32 disabled)" if on_gpu else "CPU (20 cores)"
-        else:
-            from trt_common import TrtRunner
-
-            disk = enc_path.stat().st_size + mat_path.stat().st_size
-            enc, mat = TrtRunner(enc_path), TrtRunner(mat_path)
-            feats = {k: v.clone() for k, v in enc({"img_A": a, "img_B": b}).items()}
-            parts["encoder"] = timed(lambda: enc({"img_A": a, "img_B": b}))
-            parts["matcher"] = timed(lambda: mat(feats))
-            total = timed(lambda: mat(enc({"img_A": a, "img_B": b})))
-            out = mat(enc({"img_A": a, "img_B": b}))
-            extra["engine_device_memory_mb"] = round(
-                (enc.engine.device_memory_size_v2 + mat.engine.device_memory_size_v2) / 2**20, 1
-            )
-            extra["output_finite"] = bool(torch.isfinite(out["warp_AB"].float()).all())
-    else:
-        from common import (
-            EncoderWrapper,
-            force_autocast_dtype,
-            load_roma_omega,
-            no_autocast,
-            roma_omega_checkpoint,
-            set_matcher_amp,
-        )
+    if variant in TORCH_VARIANTS:
+        from common import force_autocast_dtype, load_roma_omega, no_autocast, roma_omega_checkpoint, set_matcher_amp
+        from matchers import apply_config
 
         model = load_roma_omega()
-        matcher = model.matcher
         disk = Path("vggtomega.pt").stat().st_size + roma_omega_checkpoint()[0].stat().st_size
+        precision = TORCH_VARIANTS[variant]
+        set_matcher_amp(model.matcher, precision != "fp32")
+        apply_config(model, cfg)
+        ctx = {"fp32": no_autocast, "fp16": lambda: force_autocast_dtype(torch.float16)}.get(
+            precision, contextlib.nullcontext
+        )
         torch.cuda.reset_peak_memory_stats()
-        if variant in TORCHTRT_VARIANTS:
-            from matchers import TorchTrtCoarseMatcher
-
-            gm = TorchTrtCoarseMatcher(matcher, TORCHTRT_VARIANTS[variant], 512, 512)
-            extra["matcher_backend"] = gm.matcher_backend
-            with torch.inference_mode(), gm._ctx():
-                feats = [f.clone() for f in gm.encoder(a, b)]
-                parts["encoder"] = timed(lambda: gm.encoder(a, b))
-                parts["matcher"] = timed(lambda: gm.matcher(*feats))
-                total = timed(lambda: gm.matcher(*gm.encoder(a, b)))
-        elif variant == "torch_bf16_full":
-            import torch.nn.functional as F
-
-            model.stage = "inference"
-            model.apply_setting("precise")
-
-            def resize(x, h, w):
-                return F.interpolate(x, size=(h, w), mode="bicubic", align_corners=False, antialias=True)
-
-            lr = [resize(x, model.H_lr, model.W_lr) for x in (a, b)]
-            hr = [resize(x, model.H_hr, model.W_hr) for x in (a, b)]
-            with torch.inference_mode():
-                total = timed(lambda: model(lr[0], lr[1], hr[0], hr[1]), 3, 15)
-            extra["setting"] = f"{model.H_lr} coarse / {model.H_hr} refine, bidirectional, refiners"
-        else:
-            import contextlib
-
-            amp = variant != "torch_fp32_coarse"
-            ctx = {
-                "torch_fp32_coarse": no_autocast,
-                "torch_fp16_coarse": lambda: force_autocast_dtype(torch.float16),
-            }.get(variant, contextlib.nullcontext)
-            set_matcher_amp(matcher, amp)
-            encoder = EncoderWrapper(matcher.vggt.aggregator, amp=amp).eval()
-            with torch.inference_mode(), ctx():
-                parts["encoder"] = timed(lambda: encoder(a, b))
-                total = timed(lambda: matcher(a, b, bidirectional=False))
-            # No separate matcher timing in PyTorch: Matcher.forward includes the encoder.
-            parts["matcher"] = {
-                "median_ms": round(total["median_ms"] - parts["encoder"]["median_ms"], 2),
-                "derived": "total - encoder",
-            }
+        with torch.inference_mode(), ctx():
+            total, _ = timed(lambda: model(lr[0], lr[1], img_A_hr=hr[0], img_B_hr=hr[1]))
+            out = model(lr[0], lr[1], img_A_hr=hr[0], img_B_hr=hr[1])
         extra["torch_peak_mb"] = round(torch.cuda.max_memory_allocated() / 2**20, 1)
+    else:
+        if variant in ONNX_VARIANTS:
+            pipe = build_onnx_pipeline(cfg, variant, artifacts)
+            disk = sum(file_size(cfg.graph_path(s, "fp32", artifacts)) for s in cfg.stages)
+        elif variant in TRT_VARIANTS:
+            pipe = build_trt_pipeline(cfg, variant, artifacts)
+            disk = sum(p.stat().st_size for p in trt_engine_paths(cfg, variant, artifacts).values())
+            extra["engine_device_memory_mb"] = round(
+                sum(r.engine.device_memory_size_v2 for r in pipe.runners.values()) / 2**20, 1
+            )
+        else:
+            from common import load_roma_omega, roma_omega_checkpoint
+
+            model = load_roma_omega()
+            disk = Path("vggtomega.pt").stat().st_size + roma_omega_checkpoint()[0].stat().st_size
+            torch.cuda.reset_peak_memory_stats()
+            pipe = build_torchtrt_pipeline(cfg, variant, model)
+            extra["torch_peak_mb"] = round(torch.cuda.max_memory_allocated() / 2**20, 1)
+        extra["backends"] = pipe.backends
+        total, n = timed(lambda: pipe.run(lr[0], lr[1], hr[0], hr[1]))
+        # Per-stage times from a separate pass (synchronising between stages).
+        pipe.timing = True
+        for _ in range(n):
+            pipe.run(lr[0], lr[1], hr[0], hr[1])
+        parts = {s: stats(v) for s, v in pipe.seconds.items()}
+        out = pipe.run(lr[0], lr[1], hr[0], hr[1])
+    extra["output_finite"] = bool(
+        all(torch.isfinite(out[f"warp_{d}"].float()).all() for d in cfg.directions)
+    )
 
     torch.cuda.synchronize()
     free1 = torch.cuda.mem_get_info()[0]
@@ -206,7 +184,7 @@ def child(variant: str, warmup: int, runs: int) -> dict:
     }
 
 
-def run_variant(variant: str, warmup: int, runs: int) -> dict:
+def run_variant(variant: str, cfg: PipelineConfig, artifacts: Path, warmup: int, runs: int) -> dict:
     time.sleep(3)  # let the previous process release memory
     baseline = mem_available_mb()
     low = [baseline]
@@ -220,7 +198,8 @@ def run_variant(variant: str, warmup: int, runs: int) -> dict:
     t = threading.Thread(target=poll, daemon=True)
     t.start()
     proc = subprocess.run(
-        [sys.executable, __file__, "--child", variant, "--warmup", str(warmup), "--runs", str(runs)],
+        [sys.executable, __file__, "--child", variant, "--warmup", str(warmup), "--runs", str(runs),
+         "--artifacts", str(artifacts), *cfg.to_args()],
         capture_output=True,
         text=True,
     )
@@ -239,13 +218,17 @@ def main() -> None:
     p.add_argument("--variants", default=",".join(DEFAULT_VARIANTS))
     p.add_argument("--warmup", type=int, default=10)
     p.add_argument("--runs", type=int, default=50)
-    p.add_argument("--out", type=Path, default=Path("deployment/results/runtime_512x512.json"))
+    PipelineConfig.add_arguments(p)
+    p.add_argument("--artifacts", type=Path, default=Path("deployment/artifacts"))
+    p.add_argument("--out", type=Path, default=None, help="default: deployment/results/runtime__<config>.json")
     p.add_argument("--append", action="store_true", help="merge into an existing results file")
     p.add_argument("--child", default=None, help=argparse.SUPPRESS)
     args = p.parse_args()
 
+    cfg = PipelineConfig.from_args(args)
+    args.out = args.out or Path(f"deployment/results/runtime__{cfg.tag}.json")
     if args.child:
-        print("RESULT " + json.dumps(child(args.child, args.warmup, args.runs)), flush=True)
+        print("RESULT " + json.dumps(child(args.child, cfg, args.artifacts, args.warmup, args.runs)), flush=True)
         return
 
     import platform
@@ -256,7 +239,7 @@ def main() -> None:
     if args.append and args.out.exists():
         records = {r["variant"]: r for r in json.loads(args.out.read_text())["variants"]}
     for variant in [v for v in args.variants.split(",") if v]:
-        rec = run_variant(variant, args.warmup, args.runs)
+        rec = run_variant(variant, cfg, args.artifacts, args.warmup, args.runs)
         records[variant] = rec
         if "error" in rec:
             print(f"{variant:28s} ERROR {rec['error']}", flush=True)
@@ -273,7 +256,7 @@ def main() -> None:
             {
                 "gpu": torch.cuda.get_device_name(0),
                 "machine": platform.machine(),
-                "image_size": [512, 512],
+                "config": cfg.describe(),
                 "batch": 1,
                 "variants": list(records.values()),
             },

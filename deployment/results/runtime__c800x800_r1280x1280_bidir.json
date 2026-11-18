@@ -1,0 +1,509 @@
+{
+  "gpu": "NVIDIA GB10",
+  "machine": "aarch64",
+  "config": {
+    "tag": "c800x800_r1280x1280_bidir",
+    "coarse_size": [
+      800,
+      800
+    ],
+    "refine_size": [
+      1280,
+      1280
+    ],
+    "direction": "both",
+    "refiners": true
+  },
+  "batch": 1,
+  "variants": [
+    {
+      "variant": "torch_bf16",
+      "total": {
+        "median_ms": 1783.37,
+        "mean_ms": 1790.34,
+        "p95_ms": 1822.44,
+        "min_ms": 1763.22,
+        "runs": 50
+      },
+      "parts": {},
+      "gpu_delta_mb": 21681.9,
+      "disk_mb": 4842.3,
+      "torch_peak_mb": 12771.2,
+      "output_finite": true,
+      "system_peak_mb": 22498.5
+    },
+    {
+      "variant": "torch_fp32",
+      "total": {
+        "median_ms": 3104.81,
+        "mean_ms": 3103.77,
+        "p95_ms": 3105.87,
+        "min_ms": 3083.21,
+        "runs": 5
+      },
+      "parts": {},
+      "gpu_delta_mb": 22739.6,
+      "disk_mb": 4842.3,
+      "torch_peak_mb": 13496.0,
+      "output_finite": true,
+      "system_peak_mb": 23375.8
+    },
+    {
+      "variant": "onnx_gpu_fp32",
+      "total": {
+        "median_ms": 5307.15,
+        "mean_ms": 5315.33,
+        "p95_ms": 5321.82,
+        "min_ms": 5301.98,
+        "runs": 5
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 2957.52,
+          "mean_ms": 2952.4,
+          "p95_ms": 2957.63,
+          "min_ms": 2939.34,
+          "runs": 5
+        },
+        "matcher": {
+          "median_ms": 606.32,
+          "mean_ms": 606.3,
+          "p95_ms": 608.0,
+          "min_ms": 604.18,
+          "runs": 5
+        },
+        "refiner": {
+          "median_ms": 476.68,
+          "mean_ms": 475.74,
+          "p95_ms": 477.89,
+          "min_ms": 471.36,
+          "runs": 5
+        },
+        "refiner2": {
+          "median_ms": 1286.12,
+          "mean_ms": 1288.35,
+          "p95_ms": 1289.98,
+          "min_ms": 1282.99,
+          "runs": 5
+        }
+      },
+      "gpu_delta_mb": 44446.5,
+      "disk_mb": 3980.2,
+      "backends": {
+        "encoder": "onnxruntime",
+        "matcher": "onnxruntime",
+        "refiner": "onnxruntime",
+        "refiner2": "onnxruntime"
+      },
+      "output_finite": true,
+      "system_peak_mb": 45145.5
+    },
+    {
+      "variant": "trt_fp32",
+      "total": {
+        "median_ms": 3775.31,
+        "mean_ms": 3777.24,
+        "p95_ms": 3777.48,
+        "min_ms": 3758.12,
+        "runs": 5
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 2477.13,
+          "mean_ms": 2477.72,
+          "p95_ms": 2479.76,
+          "min_ms": 2470.25,
+          "runs": 5
+        },
+        "matcher": {
+          "median_ms": 505.94,
+          "mean_ms": 505.99,
+          "p95_ms": 506.49,
+          "min_ms": 503.39,
+          "runs": 5
+        },
+        "refiner": {
+          "median_ms": 230.29,
+          "mean_ms": 230.44,
+          "p95_ms": 231.56,
+          "min_ms": 228.01,
+          "runs": 5
+        },
+        "refiner2": {
+          "median_ms": 566.66,
+          "mean_ms": 566.17,
+          "p95_ms": 570.02,
+          "min_ms": 559.24,
+          "runs": 5
+        }
+      },
+      "gpu_delta_mb": 18422.7,
+      "disk_mb": 4018.4,
+      "engine_device_memory_mb": 13406.5,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "output_finite": true,
+      "system_peak_mb": 19405.6
+    },
+    {
+      "variant": "trt_fp32_tf32",
+      "total": {
+        "median_ms": 3207.03,
+        "mean_ms": 3228.8,
+        "p95_ms": 3455.19,
+        "min_ms": 2882.88,
+        "runs": 50
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 2073.46,
+          "mean_ms": 2112.38,
+          "p95_ms": 2206.91,
+          "min_ms": 2038.71,
+          "runs": 50
+        },
+        "matcher": {
+          "median_ms": 409.84,
+          "mean_ms": 409.15,
+          "p95_ms": 448.08,
+          "min_ms": 364.87,
+          "runs": 50
+        },
+        "refiner": {
+          "median_ms": 187.87,
+          "mean_ms": 183.98,
+          "p95_ms": 203.55,
+          "min_ms": 160.81,
+          "runs": 50
+        },
+        "refiner2": {
+          "median_ms": 463.36,
+          "mean_ms": 459.61,
+          "p95_ms": 500.6,
+          "min_ms": 407.61,
+          "runs": 50
+        }
+      },
+      "gpu_delta_mb": 18700.4,
+      "disk_mb": 3993.1,
+      "engine_device_memory_mb": 13365.9,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "output_finite": true,
+      "system_peak_mb": 19781.5
+    },
+    {
+      "variant": "trt_bf16",
+      "total": {
+        "median_ms": 966.76,
+        "mean_ms": 966.76,
+        "p95_ms": 978.69,
+        "min_ms": 942.42,
+        "runs": 50
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 309.82,
+          "mean_ms": 309.51,
+          "p95_ms": 317.7,
+          "min_ms": 301.44,
+          "runs": 50
+        },
+        "matcher": {
+          "median_ms": 59.68,
+          "mean_ms": 59.66,
+          "p95_ms": 62.18,
+          "min_ms": 56.0,
+          "runs": 50
+        },
+        "refiner": {
+          "median_ms": 185.82,
+          "mean_ms": 188.67,
+          "p95_ms": 201.2,
+          "min_ms": 168.84,
+          "runs": 50
+        },
+        "refiner2": {
+          "median_ms": 447.83,
+          "mean_ms": 448.19,
+          "p95_ms": 460.31,
+          "min_ms": 435.42,
+          "runs": 50
+        }
+      },
+      "gpu_delta_mb": 10322.6,
+      "disk_mb": 2060.6,
+      "engine_device_memory_mb": 7237.5,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "output_finite": true,
+      "system_peak_mb": 11276.5
+    },
+    {
+      "variant": "trt_fp16enc_bf16",
+      "total": {
+        "median_ms": 995.85,
+        "mean_ms": 999.41,
+        "p95_ms": 1021.3,
+        "min_ms": 974.3,
+        "runs": 50
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 303.37,
+          "mean_ms": 303.18,
+          "p95_ms": 309.5,
+          "min_ms": 293.25,
+          "runs": 50
+        },
+        "matcher": {
+          "median_ms": 59.24,
+          "mean_ms": 59.14,
+          "p95_ms": 61.33,
+          "min_ms": 55.64,
+          "runs": 50
+        },
+        "refiner": {
+          "median_ms": 197.72,
+          "mean_ms": 197.12,
+          "p95_ms": 201.15,
+          "min_ms": 189.35,
+          "runs": 50
+        },
+        "refiner2": {
+          "median_ms": 438.16,
+          "mean_ms": 438.79,
+          "p95_ms": 447.87,
+          "min_ms": 428.72,
+          "runs": 50
+        }
+      },
+      "gpu_delta_mb": 10294.5,
+      "disk_mb": 2046.9,
+      "engine_device_memory_mb": 7239.0,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "output_finite": true,
+      "system_peak_mb": 11336.6
+    },
+    {
+      "variant": "trt_fp16",
+      "total": {
+        "median_ms": 769.86,
+        "mean_ms": 766.73,
+        "p95_ms": 784.84,
+        "min_ms": 734.42,
+        "runs": 50
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 294.88,
+          "mean_ms": 292.67,
+          "p95_ms": 321.94,
+          "min_ms": 264.5,
+          "runs": 50
+        },
+        "matcher": {
+          "median_ms": 55.43,
+          "mean_ms": 54.4,
+          "p95_ms": 58.57,
+          "min_ms": 47.95,
+          "runs": 50
+        },
+        "refiner": {
+          "median_ms": 124.48,
+          "mean_ms": 121.89,
+          "p95_ms": 130.41,
+          "min_ms": 111.03,
+          "runs": 50
+        },
+        "refiner2": {
+          "median_ms": 311.42,
+          "mean_ms": 312.69,
+          "p95_ms": 344.23,
+          "min_ms": 279.73,
+          "runs": 50
+        }
+      },
+      "gpu_delta_mb": 10645.1,
+      "disk_mb": 2027.6,
+      "engine_device_memory_mb": 7082.5,
+      "backends": {
+        "encoder": "tensorrt",
+        "matcher": "tensorrt",
+        "refiner": "tensorrt",
+        "refiner2": "tensorrt"
+      },
+      "output_finite": false,
+      "system_peak_mb": 11187.2
+    },
+    {
+      "variant": "onnx_cpu_fp32",
+      "total": {
+        "median_ms": 36694.22,
+        "mean_ms": 36784.2,
+        "p95_ms": 36885.82,
+        "min_ms": 36505.85,
+        "runs": 5
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 19866.59,
+          "mean_ms": 19869.01,
+          "p95_ms": 19923.75,
+          "min_ms": 19747.84,
+          "runs": 5
+        },
+        "matcher": {
+          "median_ms": 4824.27,
+          "mean_ms": 4823.65,
+          "p95_ms": 4847.04,
+          "min_ms": 4773.96,
+          "runs": 5
+        },
+        "refiner": {
+          "median_ms": 3193.16,
+          "mean_ms": 3162.3,
+          "p95_ms": 3197.67,
+          "min_ms": 3100.08,
+          "runs": 5
+        },
+        "refiner2": {
+          "median_ms": 8369.5,
+          "mean_ms": 8411.4,
+          "p95_ms": 8458.74,
+          "min_ms": 8283.6,
+          "runs": 5
+        }
+      },
+      "gpu_delta_mb": 25161.7,
+      "disk_mb": 3980.2,
+      "backends": {
+        "encoder": "onnxruntime",
+        "matcher": "onnxruntime",
+        "refiner": "onnxruntime",
+        "refiner2": "onnxruntime"
+      },
+      "output_finite": true,
+      "system_peak_mb": 25632.8
+    },
+    {
+      "variant": "torchtrt_fp32",
+      "total": {
+        "median_ms": 4941.52,
+        "mean_ms": 4939.25,
+        "p95_ms": 4948.06,
+        "min_ms": 4923.57,
+        "runs": 5
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 2649.52,
+          "mean_ms": 2649.61,
+          "p95_ms": 2663.79,
+          "min_ms": 2628.43,
+          "runs": 5
+        },
+        "matcher": {
+          "median_ms": 523.43,
+          "mean_ms": 525.52,
+          "p95_ms": 535.5,
+          "min_ms": 512.79,
+          "runs": 5
+        },
+        "refiner": {
+          "median_ms": 611.14,
+          "mean_ms": 610.25,
+          "p95_ms": 617.18,
+          "min_ms": 594.4,
+          "runs": 5
+        },
+        "refiner2": {
+          "median_ms": 1139.67,
+          "mean_ms": 1141.14,
+          "p95_ms": 1143.4,
+          "min_ms": 1125.82,
+          "runs": 5
+        }
+      },
+      "gpu_delta_mb": 38751.6,
+      "disk_mb": 4842.3,
+      "torch_peak_mb": 4321.2,
+      "backends": {
+        "encoder": "torch_tensorrt",
+        "matcher": "torch_tensorrt",
+        "refiner": "torch_tensorrt",
+        "refiner2": "pytorch (ValueError compiling with Torch-TensorRT)"
+      },
+      "output_finite": true,
+      "system_peak_mb": 40109.5
+    },
+    {
+      "variant": "torchtrt_bf16",
+      "total": {
+        "median_ms": 1666.86,
+        "mean_ms": 1666.21,
+        "p95_ms": 1686.95,
+        "min_ms": 1641.93,
+        "runs": 50
+      },
+      "parts": {
+        "encoder": {
+          "median_ms": 315.7,
+          "mean_ms": 313.71,
+          "p95_ms": 333.89,
+          "min_ms": 289.64,
+          "runs": 50
+        },
+        "matcher": {
+          "median_ms": 90.74,
+          "mean_ms": 90.02,
+          "p95_ms": 97.03,
+          "min_ms": 82.2,
+          "runs": 50
+        },
+        "refiner": {
+          "median_ms": 345.25,
+          "mean_ms": 347.99,
+          "p95_ms": 371.23,
+          "min_ms": 323.17,
+          "runs": 50
+        },
+        "refiner2": {
+          "median_ms": 924.92,
+          "mean_ms": 926.01,
+          "p95_ms": 941.13,
+          "min_ms": 905.83,
+          "runs": 50
+        }
+      },
+      "gpu_delta_mb": 27342.7,
+      "disk_mb": 4842.3,
+      "torch_peak_mb": 5935.1,
+      "backends": {
+        "encoder": "torch_tensorrt",
+        "matcher": "pytorch (AssertionError compiling with Torch-TensorRT)",
+        "refiner": "pytorch (AttributeError compiling with Torch-TensorRT)",
+        "refiner2": "pytorch (AttributeError compiling with Torch-TensorRT)"
+      },
+      "output_finite": true,
+      "system_peak_mb": 28459.2
+    }
+  ]
+}

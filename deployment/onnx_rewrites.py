@@ -11,6 +11,14 @@ rewrite_deconv_as_depth_to_space
 
     The rewrite is exact (same arithmetic, same summation per output element);
     it is verified numerically on the fp32 graph, see README.
+
+cast_constants_to_input_dtype
+    In a 16-bit refiner graph the exporter's optimiser folds some Conv +
+    BatchNorm pairs into a Conv whose folded weights are fp32 initializers
+    while its input is bf16/fp16, and leaves BatchNormalization parameters
+    fp32 next to a 16-bit input. ONNX requires one type per node; TensorRT
+    rejects the mismatch. A Cast to the input's type is inserted on each such
+    constant (weights stay fp32 on disk, as in the rest of a 16-bit graph).
 """
 
 from __future__ import annotations
@@ -114,3 +122,46 @@ def rewrite_deconv_as_depth_to_space(onnx_path: Path) -> int:
         location=data_name,
     )
     return rewritten
+
+
+def cast_constants_to_input_dtype(onnx_path: Path, op_types=("Conv", "BatchNormalization")) -> int:
+    """Cast fp32 initializers feeding 16-bit Conv/BatchNormalization nodes to the
+    node's input type, in place. Returns how many constants were cast."""
+    onnx_path = Path(onnx_path)
+    model = onnx.load(str(onnx_path), load_external_data=True)
+    graph = model.graph
+    init_dtype = {i.name: i.data_type for i in graph.initializer}
+    dtype = {v.name: v.type.tensor_type.elem_type for v in list(graph.value_info) + list(graph.input)}
+    for n in graph.node:  # Cast outputs are not always in value_info
+        if n.op_type == "Cast":
+            dtype[n.output[0]] = next(a.i for a in n.attribute if a.name == "to")
+
+    new_nodes, casts = [], {}
+    for node in graph.node:
+        if node.op_type in op_types:
+            want = dtype.get(node.input[0], TP.FLOAT)
+            if want in (TP.BFLOAT16, TP.FLOAT16):
+                for idx in range(1, len(node.input)):
+                    name = node.input[idx]
+                    if init_dtype.get(name) == TP.FLOAT:
+                        key = (name, want)
+                        if key not in casts:
+                            casts[key] = f"{name}__as_{TP.DataType.Name(want).lower()}"
+                            new_nodes.append(helper.make_node("Cast", [name], [casts[key]], to=want))
+                        node.input[idx] = casts[key]
+        new_nodes.append(node)
+    if not casts:
+        return 0
+    del graph.node[:]
+    graph.node.extend(new_nodes)
+    data_name = onnx_path.name + ".data"
+    # onnx appends to an existing external-data file; start clean.
+    (onnx_path.parent / data_name).unlink(missing_ok=True)
+    onnx.save(
+        model,
+        str(onnx_path),
+        save_as_external_data=True,
+        all_tensors_to_one_file=True,
+        location=data_name,
+    )
+    return len(casts)

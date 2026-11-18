@@ -7,13 +7,15 @@ Datasets
   mmim_medical  MMIM medical, homography AUC                  [MINIMA protocol]
   mmim_remote   MMIM remote sensing, homography AUC           [MINIMA protocol]
 
-Variants: see matchers.py. The seed affects match sampling and the robust
-estimator (MAGSAC / RANSAC), not the network.
+Variants: see matchers.py. Pipeline configuration (coarse size, refinement
+size, direction, refiners): see pipeline.py; the defaults are upstream's
+``precise`` setting. The seed affects match sampling and the robust estimator
+(MAGSAC / RANSAC), not the network.
 
 Run from the repository root:
 
     python deployment/eval_datasets.py --datasets wxbs,hardmatch \
-        --variants torch_bf16_full --seeds 1
+        --variants torch_bf16,trt_bf16 --seeds 1
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from matchers import VARIANTS, RoMaOmegaVariants  # noqa: E402
+from pipeline import PipelineConfig  # noqa: E402
 
 DATASETS = ("wxbs", "hardmatch", "diode", "mmim_medical", "mmim_remote")
 # Headline number per dataset, as (key path, label).
@@ -65,10 +68,11 @@ def headline(dataset: str, result: dict) -> float:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--datasets", default="wxbs")
-    p.add_argument("--variants", default="torch_bf16_full")
+    p.add_argument("--variants", default="torch_bf16")
+    PipelineConfig.add_arguments(p)
     p.add_argument("--seeds", default="1")
     p.add_argument("--artifacts", type=Path, default=Path("deployment/artifacts"))
-    p.add_argument("--num-corresp", type=int, default=None)
+    p.add_argument("--num-corresp", type=int, default=None, help="matches sampled per pair (default 5000)")
     p.add_argument("--diode-root", type=Path, default=Path("data/DIODE"))
     p.add_argument("--mmim-root", type=Path, default=Path("data/MMIM"))
     p.add_argument("--minima-root", type=Path, default=Path("MINIMA"))
@@ -87,12 +91,14 @@ def main() -> None:
     Path("data").mkdir(exist_ok=True)
     # Benchmarks are built before seeding: DIODE homographies are seeded per file.
     benchmarks = {d: build_benchmark(d, args) for d in datasets}
-    models = RoMaOmegaVariants(args.artifacts, num_corresp=args.num_corresp)
+    cfg = PipelineConfig.from_args(args)
+    models = RoMaOmegaVariants(cfg, args.artifacts, num_corresp=args.num_corresp)
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     summary = []
-    for dataset in datasets:
-        for variant in variants:
+    # Variants outermost: a graph pipeline is built once and released after use.
+    for variant in variants:
+        for dataset in datasets:
             matcher = models.select(variant)
             runs = []
             for seed in seeds:
@@ -118,6 +124,7 @@ def main() -> None:
             record = {
                 "dataset": dataset,
                 "variant": variant,
+                "config": cfg.tag,
                 "metric": HEADLINE[dataset],
                 "scale": "0-100",
                 "setting": models.describe(variant),
@@ -129,12 +136,14 @@ def main() -> None:
                 "runs": runs,
             }
             suffix = "" if args.max_pairs is None else f"__max{args.max_pairs}"
-            (args.out_dir / f"{dataset}__{variant}{suffix}.json").write_text(
+            (args.out_dir / f"{dataset}__{cfg.tag}__{variant}{suffix}.json").write_text(
                 json.dumps(record, indent=2) + "\n"
             )
             summary.append(record)
+        models.release(variant)
 
-    print(f"\n{'dataset':14s} {'variant':20s} {'metric':9s} {'mean':>7s} {'std':>6s} {'min':>7s} {'max':>7s}  runs")
+    print(f"\nconfig {cfg.tag}, {models.num_corresp} matches per pair")
+    print(f"{'dataset':14s} {'variant':20s} {'metric':9s} {'mean':>7s} {'std':>6s} {'min':>7s} {'max':>7s}  runs")
     for r in summary:
         std = f"{r['std']:.2f}" if r["std"] is not None else "   -"
         print(

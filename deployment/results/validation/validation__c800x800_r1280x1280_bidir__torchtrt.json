@@ -1,0 +1,108 @@
+{
+  "config": {
+    "tag": "c800x800_r1280x1280_bidir",
+    "coarse_size": [
+      800,
+      800
+    ],
+    "refine_size": [
+      1280,
+      1280
+    ],
+    "direction": "both",
+    "refiners": true
+  },
+  "pair": [
+    ".WxBS/v1.1/WGALBS/bridge/01.png",
+    ".WxBS/v1.1/WGALBS/bridge/02.png"
+  ],
+  "reference": "torch_fp32",
+  "output_grid": [
+    1280,
+    1280
+  ],
+  "variants": {
+    "torchtrt_fp32": {
+      "match_ms": 4841.8,
+      "tag": "c800x800_r1280x1280_bidir",
+      "coarse_size": [
+        800,
+        800
+      ],
+      "refine_size": [
+        1280,
+        1280
+      ],
+      "direction": "both",
+      "refiners": true,
+      "num_corresp": 5000,
+      "backends": {
+        "encoder": "torch_tensorrt",
+        "matcher": "torch_tensorrt",
+        "refiner": "torch_tensorrt",
+        "refiner2": "pytorch (ValueError compiling with Torch-TensorRT)"
+      },
+      "vs_reference": {
+        "AB": {
+          "finite": true,
+          "overlap_pixels": 16112,
+          "warp_err_px_mean": 0.03283002972602844,
+          "warp_err_px_median": 0.024630185216665268,
+          "warp_err_px_p99": 0.1475238800048828,
+          "warp_err_px_max": 0.7082361578941345,
+          "overlap_abs_diff_mean": 0.0005395330372266471
+        },
+        "BA": {
+          "finite": true,
+          "overlap_pixels": 7703,
+          "warp_err_px_mean": 0.39516109228134155,
+          "warp_err_px_median": 0.04274680092930794,
+          "warp_err_px_p99": 15.172529220581055,
+          "warp_err_px_max": 45.20689010620117,
+          "overlap_abs_diff_mean": 0.0012211359571665525
+        }
+      }
+    },
+    "torchtrt_bf16": {
+      "match_ms": 1633.9,
+      "tag": "c800x800_r1280x1280_bidir",
+      "coarse_size": [
+        800,
+        800
+      ],
+      "refine_size": [
+        1280,
+        1280
+      ],
+      "direction": "both",
+      "refiners": true,
+      "num_corresp": 5000,
+      "backends": {
+        "encoder": "torch_tensorrt",
+        "matcher": "pytorch (AssertionError compiling with Torch-TensorRT)",
+        "refiner": "pytorch (AttributeError compiling with Torch-TensorRT)",
+        "refiner2": "pytorch (AttributeError compiling with Torch-TensorRT)"
+      },
+      "vs_reference": {
+        "AB": {
+          "finite": true,
+          "overlap_pixels": 16112,
+          "warp_err_px_mean": 0.23895269632339478,
+          "warp_err_px_median": 0.12004593014717102,
+          "warp_err_px_p99": 3.448878049850464,
+          "warp_err_px_max": 6.266165256500244,
+          "overlap_abs_diff_mean": 0.005451021250337362
+        },
+        "BA": {
+          "finite": true,
+          "overlap_pixels": 7703,
+          "warp_err_px_mean": 2.960909128189087,
+          "warp_err_px_median": 0.39038610458374023,
+          "warp_err_px_p99": 86.46244812011719,
+          "warp_err_px_max": 117.93766021728516,
+          "overlap_abs_diff_mean": 0.006178544834256172
+        }
+      }
+    }
+  }
+}
